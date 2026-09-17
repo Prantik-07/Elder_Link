@@ -3,6 +3,7 @@ import { Header } from "./components/Header";
 import { CarePage } from "./pages/CarePage";
 import { TimelinePage } from "./pages/TimelinePage";
 import { HandoffPage } from "./pages/HandoffPage";
+import { CareCirclePage } from "./pages/CareCirclePage";
 import { CareEventsProvider } from "./state/CareEventsContext";
 
 export default function App() {
@@ -21,6 +22,7 @@ export default function App() {
             <Route path="/" element={<CarePage />} />
             <Route path="/timeline" element={<TimelinePage />} />
             <Route path="/handoff" element={<HandoffPage />} />
+            <Route path="/care-circle" element={<CareCirclePage />} />
           </Routes>
         </main>
       </div>
