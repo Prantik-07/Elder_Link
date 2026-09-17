@@ -102,7 +102,7 @@ elderlink/
 ├── README.md
 ├── .gitignore
 ├── .env.example
-├── frontend/          # React/Next.js frontend (TBD)
+├── frontend/          # React + Vite caregiver UI (Care / Timeline / Handoff), mock CareEvent data
 ├── backend/
 │   ├── core/
 │   │   └── transcription/  # Transcription abstraction (Voxtral + Mock)
@@ -147,6 +147,16 @@ aws s3 cp elderlink-test.wav s3://<bucket-name>/audio/test-note.wav
 
 # Check transcript
 aws s3 cp s3://<bucket-name>/transcripts/test-note.json -
+```
+
+## Frontend
+
+The caregiver-facing UI (`frontend/`) is a standalone React + Vite app with three views - **Care** (what changed since your last handoff), **Timeline** (longitudinal record), and **Handoff** (what the next caregiver needs to know). It runs entirely on mock `CareEvent` data (`frontend/src/data/mockEvents.ts`) and is not wired to the AWS pipeline above - the backend's real output is a transcript JSON, not yet a structured Care Event, so there is nothing live to connect to until the Day 2 extraction step exists.
+
+```bash
+cd frontend
+npm install
+npm run dev
 ```
 
 ## Hackathon
