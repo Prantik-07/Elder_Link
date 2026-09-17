@@ -4,6 +4,8 @@
   /* Editorial serif for display headlines, clean sans for interface text. */
   --font-display: "Fraunces", "Iowan Old Style", "Georgia", serif;
   --font-sans: "Inter", -apple-system, "Segoe UI", sans-serif;
+  /* Used sparingly - the hero quote and family-photo caption only. */
+  --font-hand: "Caveat", "Segoe Script", cursive;
 
   /* Warm, premium palette derived from the approved design reference. */
   --color-ivory: #faf7f0;
@@ -97,6 +99,10 @@ body {
 
 .font-display {
   font-family: var(--font-display);
+}
+
+.font-hand {
+  font-family: var(--font-hand);
 }
 
 /* Thin, editorial scrollbars so custom scroll areas don't feel like a raw browser default. */
