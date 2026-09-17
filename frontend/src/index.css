@@ -1,0 +1,113 @@
+@import "tailwindcss";
+
+@theme {
+  /* Editorial serif for display headlines, clean sans for interface text. */
+  --font-display: "Fraunces", "Iowan Old Style", "Georgia", serif;
+  --font-sans: "Inter", -apple-system, "Segoe UI", sans-serif;
+
+  /* Warm, premium palette derived from the approved design reference. */
+  --color-ivory: #faf7f0;
+  --color-ivory-soft: #f4efe4;
+  --color-paper: #fffdf9;
+  --color-line: #e8e1d3;
+  --color-line-soft: #eee8db;
+
+  --color-ink: #1c2a2e;
+  --color-ink-soft: #4b5a5c;
+  --color-ink-muted: #7a8482;
+
+  --color-teal: #1f4a43;
+  --color-teal-dark: #163934;
+  --color-teal-soft: #e4ede9;
+
+  --color-amber: #b5730e;
+  --color-amber-soft: #fbf0da;
+  --color-amber-line: #edd6a0;
+
+  --color-verified: #2f7a53;
+  --color-verified-soft: #e5f1e7;
+  --color-verified-line: #c7e2cd;
+
+  --color-uncertain: #55606b;
+  --color-uncertain-soft: #edeef0;
+  --color-uncertain-line: #d9dce0;
+
+  --color-concern: #b34a3d;
+  --color-concern-soft: #fbeae6;
+
+  --color-med: #3f7d63;
+  --color-med-soft: #e4f0e8;
+
+  --color-obs: #4f6a9e;
+  --color-obs-soft: #e8edf6;
+
+  --color-routine: #4a5f8a;
+  --color-routine-soft: #eaeef6;
+
+  --shadow-card: 0 1px 2px rgba(28, 42, 46, 0.04), 0 1px 1px rgba(28, 42, 46, 0.03);
+  --shadow-panel: 0 12px 32px -12px rgba(28, 42, 46, 0.18), 0 2px 8px rgba(28, 42, 46, 0.06);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: light;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--color-ivory);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+::selection {
+  background: var(--color-amber-soft);
+  color: var(--color-ink);
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-teal);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+.font-display {
+  font-family: var(--font-display);
+}
+
+/* Thin, editorial scrollbars so custom scroll areas don't feel like a raw browser default. */
+.thin-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-line) transparent;
+}
+.thin-scroll::-webkit-scrollbar {
+  width: 8px;
+}
+.thin-scroll::-webkit-scrollbar-thumb {
+  background: var(--color-line);
+  border-radius: 8px;
+}
