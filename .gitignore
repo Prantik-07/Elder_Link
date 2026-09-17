@@ -48,8 +48,12 @@ __pycache__/
 *.pyd
 .Python
 venv/
+.venv/
 env/
 pip-wheel-metadata/
+
+# Test audio files
+elderlink-test.*
 
 # Misc
 *.local

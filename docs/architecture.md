@@ -2,34 +2,68 @@
 
 ## System Overview
 
+### Full Intended Pipeline (Future)
+
 ```
-Browser → S3 → Amazon Transcribe → EventBridge → Lambda → Amazon Bedrock → Validation → DynamoDB → API Gateway → Frontend
+Browser → S3 → Lambda → Amazon Bedrock Voxtral → Transcript → Bedrock Extraction → Validation → DynamoDB → API Gateway → Frontend
+```
+
+### Currently Deployed (Day 1)
+
+```
+S3 (audio/) → EventBridge → Lambda → TranscriptionProvider (Mock/Voxtral) → S3 (transcripts/)
 ```
 
 ## Service Roles
 
 | Service | Role |
 |---------|------|
-| **S3** | Durable, private, encrypted storage for caregiver voice note audio files. Uploads are presigned; no public access. |
-| **Amazon Transcribe** | Converts uploaded audio to timestamped transcripts. Triggered via S3 event → EventBridge → Transcribe job. |
-| **EventBridge** | Decouples Transcribe completion from downstream processing. Routes `Transcribe Job State Change` events to Lambda. |
-| **Lambda** | Stateless orchestrator: fetches transcript, calls Bedrock for structured extraction, runs safety validation, writes Care Events to DynamoDB. |
-| **Amazon Bedrock** | LLM-based structured extraction. Transforms raw transcript into typed Care Events (medications, vitals, tasks, observations, alerts). |
-| **Validation** | Deterministic safety checks: required fields, enum values, dose ranges, urgency flags, no-diagnosis guardrails. |
-| **DynamoDB** | Single-table design for Care Events. Partition key: `care_recipient_id`, sort key: `event_timestamp`. Low-latency reads for handoff views. |
-| **API Gateway** | HTTPS frontend access. REST endpoints for timeline, what-changed, and handoff summary. Auth via API key / Cognito (TBD). |
-| **Frontend** | Read-only React/Next.js app. Timeline view, What Changed diff, Care Handoff printable summary. |
+| **S3** | Durable, private, encrypted storage for caregiver voice note audio files. Uploads are presigned; no public access. Single bucket with `audio/` and `transcripts/` prefixes. |
+| **EventBridge** | Routes S3 `Object Created` events (filtered to `audio/` prefix) to Lambda. |
+| **Lambda** | Stateless processor: downloads audio, invokes transcription provider, writes transcript JSON to `transcripts/`. |
+| **Amazon Bedrock Voxtral** | Speech-to-text transcription using `mistral.voxtral-mini-3b-2507`. **Currently blocked by AWS account verification.** |
+| **MockTranscriptionProvider** | Deterministic provider returning fixed Hindi/English transcript for infrastructure testing. **Currently active in deployed stack.** |
+| **Amazon Bedrock Extraction** | (Future) LLM-based structured extraction. Transforms raw transcript into typed Care Events. |
+| **Validation** | (Future) Deterministic safety checks: required fields, enum values, dose ranges, urgency flags, no-diagnosis guardrails. |
+| **DynamoDB** | (Future) Single-table design for Care Events. |
+| **API Gateway** | (Future) HTTPS frontend access. |
+| **Frontend** | (Future) Read-only React/Next.js app. |
 
-## Data Flow
+**Live Bedrock inference is currently pending AWS account verification.**
 
-1. Caregiver records voice note in frontend → presigned S3 PUT
-2. S3 `ObjectCreated` → EventBridge → `StartTranscriptionJob`
-3. Transcribe completes → `Transcribe Job State Change` → EventBridge → Lambda
-4. Lambda: `GetTranscriptionJob` → download transcript JSON
-5. Lambda: invoke Bedrock with transcript + extraction prompt → structured JSON
-6. Lambda: validate extraction output → reject/flag unsafe content
-7. Lambda: `PutItem` Care Events to DynamoDB
-8. Frontend: `GET /timeline`, `GET /handoff` → API Gateway → Lambda → DynamoDB → JSON
+## Data Flow (Deployed)
+
+1. Caregiver uploads voice note to `s3://<bucket>/audio/<note-id>.wav` (via presigned URL)
+2. S3 emits `Object Created` event → EventBridge (EventBridge notifications enabled on bucket)
+3. EventBridge rule `elderlink-s3-audio-created` matches `audio/` prefix → invokes Lambda `elderlink-process-audio`
+4. Lambda: `GetObject` audio from S3 → determines format from extension
+5. Lambda: calls configured `TranscriptionProvider.transcribe(audio_bytes, format)`
+6. Provider returns `TranscriptionResult` (success/failure with transcript/error)
+7. Lambda: `PutObject` transcript JSON to `s3://<bucket>/transcripts/<note-id>.json`
+
+### Transcript JSON Schema
+
+```json
+{
+  "note_id": "string",
+  "source_audio_key": "string",
+  "provider": "mock|voxtral",
+  "model": "string",
+  "status": "completed|failed",
+  "transcript": "string",
+  "processed_at": "ISO8601 UTC timestamp",
+  "error": "string|null"
+}
+```
+
+## Provider Selection
+
+| Environment Variable | Value | Provider |
+|---------------------|-------|----------|
+| `TRANSCRIPTION_PROVIDER` | `mock` | `MockTranscriptionProvider` (default, works without Bedrock) |
+| `TRANSCRIPTION_PROVIDER` | `voxtral` | `VoxtralProvider` (requires Bedrock access) |
+
+Default in deployed stack: `mock`
 
 ## Safety Guardrails
 
@@ -47,18 +81,90 @@ We are not adding AWS services merely to increase the service count. The followi
 - SNS / SES / WhatsApp (notifications are stretch)
 - Cognito (auth deferred to post-hackathon)
 - CloudFront (API Gateway edge-optimized is sufficient)
+- Amazon Transcribe (replaced by Bedrock Voxtral for simpler pipeline)
 
 ## Region Selection
 
-Single region: **us-east-1** — supports all required services (S3, Lambda, API Gateway, EventBridge, DynamoDB, Transcribe, Bedrock) with lowest latency for US-based hackathon demo.
+Single region: **us-east-1** — supports all required services (S3, Lambda, EventBridge, Bedrock, DynamoDB) with lowest latency for US-based hackathon demo.
 
 ## Cost Controls
 
 - S3: Lifecycle rule → delete audio after 30 days
-- Transcribe: Pay-per-minute, only on upload
-- Bedrock: Haiku model (~$0.25/1M input tokens), minimal usage
+- Bedrock Voxtral: Pay-per-inference, only on upload
+- Bedrock Extraction: Haiku model (~$0.25/1M input tokens), minimal usage
 - DynamoDB: On-demand, < 100 reads/writes/day during hackathon
-- Lambda: 128 MB, < 1M invocations/month free tier
+- Lambda: 128 MB, 60s timeout, < 1M invocations/month free tier
 - API Gateway: 1M requests/month free tier
 
 No persistent compute. No provisioned throughput. No NAT Gateways.
+
+## Transcription Abstraction
+
+The transcription layer is isolated behind a `TranscriptionProvider` interface:
+
+- **VoxtralProvider**: Production implementation using `boto3` + Bedrock Runtime `converse` API
+- **MockTranscriptionProvider**: Deterministic local development provider
+
+This allows the rest of the application to be developed and tested without live AWS access.
+
+## IAM Least Privilege (Deployed)
+
+Lambda role `elderlink-audio-pipeline-ProcessAudioRole-*` has only:
+
+- `s3:GetObject` on `arn:aws:s3:::<bucket>/audio/*`
+- `s3:PutObject` on `arn:aws:s3:::<bucket>/transcripts/*`
+- `bedrock:InvokeModel` on `arn:aws:bedrock:us-east-1::foundation-model/mistral.voxtral-mini-3b-2507`
+- `AWSLambdaBasicExecutionRole` (CloudWatch Logs)
+
+No DynamoDB, no S3 wildcard, no AdministratorAccess.
+
+## Deployed Resources
+
+| Resource | Name/ARN |
+|----------|----------|
+| S3 Bucket | `elderlink-audio-pipeline-audiobucket-d4embqdcnuoi` |
+| Lambda Function | `elderlink-process-audio` |
+| Lambda Layer | `arn:aws:lambda:us-east-1:856447616271:layer:elderlink-transcription-core:2` |
+| EventBridge Rule | `elderlink-s3-audio-created` |
+| IAM Role | `elderlink-audio-pipeline-ProcessAudioRole-*` |
+| CloudFormation Stack | `elderlink-audio-pipeline` |
+
+## Deployment Commands
+
+```bash
+# Package
+cd infra
+aws cloudformation package --template-file template.yaml --s3-bucket elderlink-deploy-artifacts --output-template-file packaged.yaml
+
+# Deploy
+aws cloudformation deploy --template-file packaged.yaml --stack-name elderlink-audio-pipeline --capabilities CAPABILITY_IAM --region us-east-1
+
+# Get outputs
+aws cloudformation describe-stacks --stack-name elderlink-audio-pipeline --region us-east-1 --query 'Stacks[0].Outputs'
+```
+
+## End-to-End Test (Mock Mode)
+
+```bash
+# Upload test audio
+aws s3 cp elderlink-test.wav s3://elderlink-audio-pipeline-audiobucket-d4embqdcnuoi/audio/test-note.wav
+
+# Wait ~15 seconds
+
+# Verify transcript
+aws s3 cp s3://elderlink-audio-pipeline-audiobucket-d4embqdcnuoi/transcripts/test-note.json -
+```
+
+Expected output:
+```json
+{
+  "note_id": "test-note",
+  "source_audio_key": "audio/test-note.wav",
+  "provider": "mock",
+  "model": "mock-transcriber-v1",
+  "status": "completed",
+  "transcript": "Papa ne subah wali medicine le li thi, lekin lunch bahut kam khaya aur shaam ko ghutne mein phir dard tha.",
+  "processed_at": "2026-09-17T12:50:46.496801Z",
+  "error": null
+}
+```
