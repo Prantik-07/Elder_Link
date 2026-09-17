@@ -1,6 +1,7 @@
 import pytest
 import sys
 import os
+from unittest.mock import MagicMock, patch
 
 # Clear any mocked core.transcription module to ensure we test the real implementation
 if "core.transcription" in sys.modules:
@@ -114,13 +115,40 @@ class TestTranscriptionProviderInterface:
 
 
 class TestUnsupportedAudioFormat:
-    def test_voxtral_provider_rejects_unsupported_format(self):
+    @patch("core.transcription.voxtral.boto3.client")
+    def test_voxtral_provider_rejects_unsupported_format(self, mock_boto_client):
         provider = VoxtralProvider()
         result = provider.transcribe(b"audio", "xyz")
 
         assert result.success is False
         assert "Unsupported audio format" in result.error
         assert "xyz" in result.error
+
+    @patch("core.transcription.voxtral.boto3.client")
+    def test_voxtral_provider_rejects_aiff(self, mock_boto_client):
+        # aiff is not part of Bedrock Converse's AudioFormat enum - it must
+        # be rejected the same way any other unsupported format is.
+        provider = VoxtralProvider()
+        result = provider.transcribe(b"audio", "aiff")
+
+        assert result.success is False
+        assert "Unsupported audio format" in result.error
+
+    @patch("core.transcription.voxtral.boto3.client")
+    def test_voxtral_provider_accepts_m4a(self, mock_boto_client):
+        # m4a IS part of Bedrock Converse's AudioFormat enum and must pass
+        # the format check (network call is mocked, no live AWS needed).
+        mock_client = MagicMock()
+        mock_client.converse.return_value = {
+            "output": {"message": {"content": [{"text": "transcribed text"}]}}
+        }
+        mock_boto_client.return_value = mock_client
+
+        provider = VoxtralProvider()
+        result = provider.transcribe(b"audio", "m4a")
+
+        assert result.success is True
+        assert result.text == "transcribed text"
 
 
 class TestErrorHandling:

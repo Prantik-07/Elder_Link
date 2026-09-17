@@ -4,6 +4,15 @@ import sys
 from unittest.mock import MagicMock, patch
 
 import pytest
+from botocore.exceptions import ClientError
+
+
+def _not_found_error(operation: str, code: str = "404") -> ClientError:
+    # S3 HeadObject on a missing key returns 403 (not 404) when the caller
+    # lacks s3:ListBucket - both codes mean "doesn't exist" for our purposes.
+    return ClientError(
+        {"Error": {"Code": code, "Message": "Not Found"}}, operation
+    )
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
@@ -67,11 +76,13 @@ class TestIsValidAudioObject:
     def test_valid_ogg_in_audio_prefix(self):
         assert is_valid_audio_object("audio/note.ogg") is True
 
-    def test_valid_aiff_in_audio_prefix(self):
-        assert is_valid_audio_object("audio/note.aiff") is True
-
     def test_valid_m4a_in_audio_prefix(self):
         assert is_valid_audio_object("audio/note.m4a") is True
+
+    def test_aiff_rejected_not_supported_by_provider(self):
+        # aiff is not part of the Bedrock Converse AudioFormat enum, so it
+        # must not be accepted here even though older code once allowed it.
+        assert is_valid_audio_object("audio/note.aiff") is False
 
     def test_invalid_outside_audio_prefix(self):
         assert is_valid_audio_object("transcripts/note.json") is False
@@ -136,7 +147,12 @@ class TestLambdaHandler:
         mock_s3 = MagicMock()
         mock_boto_client.return_value = mock_s3
 
-        mock_s3.head_object.return_value = {"ContentLength": 1024}
+        # First head_object = audio size check (exists). Second = transcript
+        # idempotency check (must not exist yet, so raise 404).
+        mock_s3.head_object.side_effect = [
+            {"ContentLength": 1024},
+            _not_found_error("HeadObject"),
+        ]
         mock_s3.get_object.return_value = {"Body": MagicMock(read=lambda: b"fake audio")}
 
         mock_provider = MagicMock()
@@ -207,7 +223,10 @@ class TestLambdaHandler:
         mock_s3 = MagicMock()
         mock_boto_client.return_value = mock_s3
 
-        mock_s3.head_object.return_value = {"ContentLength": 1024}
+        mock_s3.head_object.side_effect = [
+            {"ContentLength": 1024},
+            _not_found_error("HeadObject"),
+        ]
         mock_s3.get_object.return_value = {"Body": MagicMock(read=lambda: b"fake audio")}
 
         mock_provider = MagicMock()
@@ -266,7 +285,10 @@ class TestLambdaHandler:
     def test_transcript_json_structure(self, mock_get_provider, mock_boto_client):
         mock_s3 = MagicMock()
         mock_boto_client.return_value = mock_s3
-        mock_s3.head_object.return_value = {"ContentLength": 1024}
+        mock_s3.head_object.side_effect = [
+            {"ContentLength": 1024},
+            _not_found_error("HeadObject"),
+        ]
         mock_s3.get_object.return_value = {"Body": MagicMock(read=lambda: b"audio")}
 
         mock_provider = MagicMock()
@@ -308,6 +330,93 @@ class TestLambdaHandler:
         assert body["transcript"] == "Test transcript"
         assert body["error"] is None
         assert "T" in body["processed_at"]
+
+    @patch("backend.lambdas.process_audio.handler.boto3.client")
+    @patch("backend.lambdas.process_audio.handler.get_provider")
+    def test_duplicate_event_skips_reprocessing(
+        self, mock_get_provider, mock_boto_client
+    ):
+        mock_s3 = MagicMock()
+        mock_boto_client.return_value = mock_s3
+
+        # Both head_object calls succeed: the audio object exists AND a
+        # transcript for it already exists (e.g. an at-least-once redelivery
+        # of the same S3 event). The handler must not reprocess.
+        mock_s3.head_object.return_value = {"ContentLength": 1024}
+
+        with patch.dict(os.environ, {
+            "TRANSCRIPTION_PROVIDER": "mock",
+            "AUDIO_BUCKET_NAME": "test-bucket",
+            "AWS_REGION": "us-east-1",
+            "MAX_AUDIO_SIZE_BYTES": "10485760",
+        }):
+            event = self.create_s3_event("test-bucket", "audio/test-note.wav")
+            result = lambda_handler(event, None)
+
+        assert result["statusCode"] == 200
+        assert "Already processed" in result["body"]
+        mock_s3.get_object.assert_not_called()
+        mock_s3.put_object.assert_not_called()
+        mock_get_provider.assert_not_called()
+
+    @patch("backend.lambdas.process_audio.handler.boto3.client")
+    @patch("backend.lambdas.process_audio.handler.get_provider")
+    def test_transcript_head_object_403_is_treated_as_not_found(
+        self, mock_get_provider, mock_boto_client
+    ):
+        # Regression test: this role has no s3:ListBucket, so S3 returns 403
+        # (not 404) for HeadObject on a transcript key that doesn't exist yet.
+        # That must NOT be mistaken for a real permissions failure.
+        mock_s3 = MagicMock()
+        mock_boto_client.return_value = mock_s3
+        mock_s3.head_object.side_effect = [
+            {"ContentLength": 1024},
+            _not_found_error("HeadObject", code="403"),
+        ]
+        mock_s3.get_object.return_value = {"Body": MagicMock(read=lambda: b"fake audio")}
+
+        mock_provider = MagicMock()
+        mock_provider.provider_name = "mock"
+        mock_provider.model_id = "mock-transcriber-v1"
+        mock_provider.transcribe.return_value = MagicMock(
+            success=True, text="Test transcript", provider="mock",
+            model="mock-transcriber-v1", error=None,
+        )
+        mock_get_provider.return_value = mock_provider
+
+        with patch.dict(os.environ, {
+            "TRANSCRIPTION_PROVIDER": "mock",
+            "AUDIO_BUCKET_NAME": "test-bucket",
+            "MAX_AUDIO_SIZE_BYTES": "10485760",
+        }):
+            event = self.create_s3_event("test-bucket", "audio/test-note.wav")
+            result = lambda_handler(event, None)
+
+        assert result["statusCode"] == 200
+        mock_s3.put_object.assert_called_once()
+
+    @patch("backend.lambdas.process_audio.handler.boto3.client")
+    def test_unexpected_s3_error_propagates(self, mock_boto_client):
+        # A genuine AWS/infra failure (not a 404 on the idempotency check)
+        # must propagate so Lambda records it as an execution error instead
+        # of it looking like a successful invocation.
+        mock_s3 = MagicMock()
+        mock_boto_client.return_value = mock_s3
+        mock_s3.head_object.side_effect = [
+            {"ContentLength": 1024},
+            ClientError(
+                {"Error": {"Code": "AccessDenied", "Message": "denied"}},
+                "HeadObject",
+            ),
+        ]
+
+        with patch.dict(os.environ, {
+            "AUDIO_BUCKET_NAME": "test-bucket",
+            "MAX_AUDIO_SIZE_BYTES": "10485760",
+        }):
+            event = self.create_s3_event("test-bucket", "audio/test-note.wav")
+            with pytest.raises(ClientError):
+                lambda_handler(event, None)
 
 
 if __name__ == "__main__":

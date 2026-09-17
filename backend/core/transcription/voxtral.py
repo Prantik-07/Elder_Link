@@ -3,6 +3,7 @@ import os
 from typing import Optional
 
 import boto3
+from botocore.config import Config
 from botocore.exceptions import BotoCoreError, ClientError
 
 from .types import TranscriptionResult
@@ -10,7 +11,10 @@ from .service import TranscriptionProvider
 
 
 class VoxtralProvider(TranscriptionProvider):
-    SUPPORTED_FORMATS = {"wav", "mp3", "flac", "ogg", "aiff"}
+    # Must match the Bedrock Converse API's AudioFormat enum (bedrock-runtime
+    # service model). "aiff" is NOT part of that enum and would fail against
+    # the real API even though the mock provider never checks format.
+    SUPPORTED_FORMATS = {"wav", "mp3", "flac", "ogg", "m4a"}
 
     def __init__(
         self,
@@ -19,7 +23,14 @@ class VoxtralProvider(TranscriptionProvider):
     ):
         self._model_id = model_id or os.getenv("BEDROCK_MODEL_ID", "mistral.voxtral-mini-3b-2507")
         self._region = region or os.getenv("AWS_REGION", "us-east-1")
-        self._client = boto3.client("bedrock-runtime", region_name=self._region)
+        # Explicit timeouts + bounded retries so a slow/unavailable Bedrock
+        # endpoint fails cleanly well inside the Lambda's own timeout instead
+        # of risking a hard Lambda kill with no structured error written.
+        self._client = boto3.client(
+            "bedrock-runtime",
+            region_name=self._region,
+            config=Config(connect_timeout=10, read_timeout=45, retries={"max_attempts": 2}),
+        )
 
     @property
     def provider_name(self) -> str:

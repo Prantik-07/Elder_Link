@@ -112,11 +112,20 @@ This allows the rest of the application to be developed and tested without live 
 Lambda role `elderlink-audio-pipeline-ProcessAudioRole-*` has only:
 
 - `s3:GetObject` on `arn:aws:s3:::<bucket>/audio/*`
-- `s3:PutObject` on `arn:aws:s3:::<bucket>/transcripts/*`
+- `s3:GetObject` + `s3:PutObject` on `arn:aws:s3:::<bucket>/transcripts/*` (GetObject is needed for the idempotency `HeadObject` check described below)
 - `bedrock:InvokeModel` on `arn:aws:bedrock:us-east-1::foundation-model/mistral.voxtral-mini-3b-2507`
 - `AWSLambdaBasicExecutionRole` (CloudWatch Logs)
 
 No DynamoDB, no S3 wildcard, no AdministratorAccess.
+
+## Day 1 Hardening Notes
+
+A post-implementation audit of the initial Day 1 build found and fixed two correctness bugs before finalizing:
+
+1. **Duplicate EventBridge trigger.** `infra/template.yaml` originally wired the S3→Lambda trigger two ways at once: an explicit `AWS::Events::Rule` (`elderlink-s3-audio-created`) *and* a SAM `Events:` block on the function, which auto-generates its own rule + permission with an identical pattern. Both were live in the deployed stack simultaneously, so every upload invoked the Lambda twice (confirmed via CloudWatch: 2 invocations, 2 log streams, for 1 S3 PutObject). Fix: removed the SAM `Events:` block; the explicit rule is now the only trigger.
+2. **Invalid Voxtral audio format.** `VoxtralProvider.SUPPORTED_FORMATS` included `"aiff"`, which is not part of Bedrock Converse's `AudioFormat` enum (verified against the installed `botocore` service model) and would have failed against the real API. `"m4a"` — which *is* valid — was accepted by the Lambda handler's extension allowlist but missing from the provider's format set. Fix: dropped `aiff`, added `m4a`, so the handler and provider now agree on exactly the formats Bedrock actually supports.
+
+As a defense-in-depth measure (not a fix for a specific observed bug), the Lambda now also checks whether a transcript already exists for a given `note_id` before doing any transcription work, since S3/EventBridge delivery is at-least-once by design (see README "Known Limitations").
 
 ## Deployed Resources
 
@@ -132,6 +141,9 @@ No DynamoDB, no S3 wildcard, no AdministratorAccess.
 ## Deployment Commands
 
 ```bash
+# Regenerate the layer content from the canonical source (backend/core/transcription/)
+./infra/build_layer.sh
+
 # Package
 cd infra
 aws cloudformation package --template-file template.yaml --s3-bucket elderlink-deploy-artifacts --output-template-file packaged.yaml
@@ -142,6 +154,8 @@ aws cloudformation deploy --template-file packaged.yaml --stack-name elderlink-a
 # Get outputs
 aws cloudformation describe-stacks --stack-name elderlink-audio-pipeline --region us-east-1 --query 'Stacks[0].Outputs'
 ```
+
+`infra/packaged.yaml` is build output (references a specific S3 deploy bucket + object hashes) and is gitignored, not committed.
 
 ## End-to-End Test (Mock Mode)
 

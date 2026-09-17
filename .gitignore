@@ -41,6 +41,14 @@ terraform.tfstate
 terraform.tfstate.backup
 *.tfvars
 
+# Generated CloudFormation package output (references a specific S3 deploy
+# bucket and object hashes - regenerate with `aws cloudformation package`)
+infra/packaged.yaml
+
+# Generated Lambda layer content - regenerate with infra/build_layer.sh
+# (single source of truth is backend/core/transcription/)
+backend/layers/transcription/python/
+
 # Python
 __pycache__/
 *.pyc

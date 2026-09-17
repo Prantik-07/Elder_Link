@@ -52,6 +52,13 @@ The pipeline supports two transcription providers via `TRANSCRIPTION_PROVIDER` e
 
 **Default: `mock`** — The deployed stack uses the mock provider because AWS account verification is pending. When verification clears, switch to `voxtral` by updating the Lambda environment variable.
 
+Supported audio formats (must match Bedrock Converse's `AudioFormat` enum): `wav`, `mp3`, `flac`, `ogg`, `m4a`.
+
+## Known Limitations (Day 1)
+
+- **At-least-once delivery**: S3/EventBridge can redeliver the same `Object Created` event. The Lambda guards against this with a cheap `HeadObject` check on the target transcript key before doing any work — if a transcript already exists for that `note_id`, the invocation is a no-op. This is not a distributed lock; a rare race between two concurrent redeliveries could still both pass the check before either writes. Full idempotency (e.g. conditional writes) is out of scope for Day 1.
+- **Live Voxtral inference is blocked**: the AWS account is still pending verification for Bedrock model access, so only the `mock` provider has been exercised end-to-end in the deployed stack.
+
 ## AWS Services
 
 - **S3** — Audio blob storage (private, encrypted, versioned)
@@ -112,7 +119,12 @@ elderlink/
 ## Deployment
 
 ```bash
-# Package
+# Regenerate the Lambda layer content from the canonical source
+# (backend/core/transcription/ is the single source of truth; the layer
+# directory is generated, not hand-maintained)
+./infra/build_layer.sh
+
+# Package (packaged.yaml is a build artifact - not committed, regenerate as needed)
 cd infra
 aws cloudformation package --template-file template.yaml --s3-bucket elderlink-deploy-artifacts --output-template-file packaged.yaml
 
@@ -122,6 +134,8 @@ aws cloudformation deploy --template-file packaged.yaml --stack-name elderlink-a
 # Get outputs
 aws cloudformation describe-stacks --stack-name elderlink-audio-pipeline --region us-east-1 --query 'Stacks[0].Outputs'
 ```
+
+boto3/botocore are provided by the Lambda's managed Python 3.11 runtime and are not bundled into the function package.
 
 ## Testing the Deployed Pipeline
 

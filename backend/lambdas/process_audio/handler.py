@@ -1,14 +1,17 @@
 import json
 import os
 import urllib.parse
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 
 import boto3
 from botocore.exceptions import BotoCoreError, ClientError
 
 
-SUPPORTED_AUDIO_EXTENSIONS = {".wav", ".mp3", ".flac", ".ogg", ".aiff", ".m4a"}
+# Must stay in sync with VoxtralProvider.SUPPORTED_FORMATS - accepting an
+# extension here that the configured provider can't handle just delays the
+# failure instead of preventing it.
+SUPPORTED_AUDIO_EXTENSIONS = {".wav", ".mp3", ".flac", ".ogg", ".m4a"}
 MAX_AUDIO_SIZE = int(os.getenv("MAX_AUDIO_SIZE_BYTES", "10485760"))
 TRANSCRIPTION_PROVIDER = os.getenv("TRANSCRIPTION_PROVIDER", "mock")
 AWS_REGION = os.getenv("ELDERLINK_AWS_REGION", "us-east-1")
@@ -92,10 +95,29 @@ def lambda_handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
             print(f"Failed to head object: {e}")
             return {"statusCode": 404, "body": "Audio object not found"}
 
+        note_id = extract_note_id(object_key)
+        transcript_key = f"transcripts/{note_id}.json"
+
+        # Defensive de-dup guard: S3/EventBridge deliver events at-least-once,
+        # so the same upload can legitimately invoke this Lambda more than
+        # once. Skip work we've already done rather than re-transcribing.
+        try:
+            s3_client.head_object(Bucket=bucket, Key=transcript_key)
+            print(f"Transcript already exists at s3://{bucket}/{transcript_key}, skipping")
+            return {"statusCode": 200, "body": "Already processed"}
+        except ClientError as e:
+            # S3 returns 403 (not 404) for HeadObject on a missing key when
+            # the caller lacks s3:ListBucket, to avoid leaking object
+            # existence to callers without list access. This role is
+            # intentionally scoped to GetObject/PutObject only (no
+            # ListBucket), so 403 here means "doesn't exist", not "denied".
+            error_code = e.response.get("Error", {}).get("Code")
+            if error_code not in ("404", "403"):
+                raise
+
         response = s3_client.get_object(Bucket=bucket, Key=object_key)
         audio_bytes = response["Body"].read()
 
-        note_id = extract_note_id(object_key)
         audio_format = get_audio_format(object_key)
 
         provider = get_provider()
@@ -105,7 +127,6 @@ def lambda_handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
 
         result: TranscriptionResult = provider.transcribe(audio_bytes, audio_format)
 
-        transcript_key = f"transcripts/{note_id}.json"
         transcript_data = {
             "note_id": note_id,
             "source_audio_key": object_key,
@@ -113,7 +134,7 @@ def lambda_handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
             "model": result.model,
             "status": "completed" if result.success else "failed",
             "transcript": result.text if result.success else "",
-            "processed_at": datetime.utcnow().isoformat() + "Z",
+            "processed_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
             "error": result.error,
         }
 
@@ -128,13 +149,17 @@ def lambda_handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
         return {"statusCode": 200, "body": json.dumps(transcript_data)}
 
     except ValueError as e:
+        # Misconfiguration (e.g. bad TRANSCRIPTION_PROVIDER, missing env var).
+        # Re-raise so Lambda records it as an execution error (CloudWatch
+        # Errors metric, default async-invoke retry) instead of it silently
+        # looking like a successful invocation.
         print(f"Configuration error: {e}")
-        return {"statusCode": 500, "body": f"Configuration error: {str(e)}"}
+        raise
 
     except (BotoCoreError, ClientError) as e:
         print(f"AWS error: {e}")
-        return {"statusCode": 500, "body": f"AWS error: {str(e)}"}
+        raise
 
     except Exception as e:
         print(f"Unexpected error: {e}")
-        return {"statusCode": 500, "body": f"Unexpected error: {str(e)}"}
+        raise

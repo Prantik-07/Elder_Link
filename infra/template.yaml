@@ -59,22 +59,12 @@ Resources:
           BEDROCK_MODEL_ID: mistral.voxtral-mini-3b-2507
           AUDIO_BUCKET_NAME: !Ref AudioBucket
           MAX_AUDIO_SIZE_BYTES: 10485760
-      Events:
-        S3ObjectCreated:
-          Type: EventBridgeRule
-          Properties:
-            Pattern:
-              source:
-                - aws.s3
-              detail-type:
-                - Object Created
-              detail:
-                bucket:
-                  name:
-                    - !Ref AudioBucket
-                object:
-                  key:
-                    - prefix: audio/
+      # NOTE: the S3 -> Lambda trigger is wired via the explicit EventBridgeRule
+      # + LambdaInvokePermission resources below, not a SAM `Events:` block.
+      # (A SAM Events block here would auto-generate a second EventBridge rule
+      # + permission with the same pattern, double-invoking this function on
+      # every upload - that was a real bug found and fixed during Day 1
+      # hardening: two rules existed in the deployed stack simultaneously.)
 
   ProcessAudioRole:
     Type: AWS::IAM::Role
@@ -99,6 +89,7 @@ Resources:
                 Resource: !Sub ${AudioBucket.Arn}/audio/*
               - Effect: Allow
                 Action:
+                  - s3:GetObject
                   - s3:PutObject
                 Resource: !Sub ${AudioBucket.Arn}/transcripts/*
         - PolicyName: ElderLinkBedrockAccess
