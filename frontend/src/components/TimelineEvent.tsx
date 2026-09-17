@@ -4,6 +4,7 @@ import type { CareEvent } from "../data/types";
 import { CATEGORY_META } from "../lib/categoryMeta";
 import { formatClock } from "../lib/format";
 import { StatusBadge } from "./StatusBadge";
+import { CaregiverAvatar } from "./CaregiverAvatar";
 
 const DOT_COLOR: Record<CareEvent["status"], string> = {
   verified: "var(--color-verified)",
@@ -76,8 +77,9 @@ export function TimelineEvent({
         </p>
         <div className="mt-1.5 flex items-center justify-between gap-3">
           <span className="flex items-center gap-1.5 text-[12.5px] text-[var(--color-ink-muted)]">
-            {event.evidence && <Mic size={11} aria-label="Has voice evidence" />}
+            <CaregiverAvatar reportedBy={event.reportedBy} size={16} />
             {event.reportedBy}
+            {event.evidence && <Mic size={11} aria-label="Has voice evidence" />}
           </span>
           <StatusBadge status={event.status} size="sm" />
         </div>

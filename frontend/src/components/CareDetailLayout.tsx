@@ -18,17 +18,18 @@ export function CareDetailLayout({ children }: { children: ReactNode }) {
   const { selectedEvent, selectEvent, setStatus } = useCareEvents();
 
   return (
-    <div className="mx-auto flex max-w-6xl">
-      <div className="min-w-0 flex-1 px-4 py-6 sm:px-6 lg:py-8">{children}</div>
+    <div className="mx-auto flex max-w-[1440px]">
+      <div className="min-w-0 flex-1 px-6 py-7 sm:px-8 lg:py-9 xl:px-10">{children}</div>
 
       <aside
-        className="sticky top-16 hidden h-[calc(100vh-4rem)] w-[26rem] shrink-0 border-l lg:block"
+        className="sticky top-16 hidden h-[calc(100vh-4rem)] w-[28rem] shrink-0 border-l lg:block xl:w-[30rem]"
         style={{ borderColor: "var(--color-line)" }}
         aria-label="Event detail"
       >
         {selectedEvent ? (
           <EvidencePanel
             event={selectedEvent}
+            onClose={() => selectEvent(null)}
             onSetStatus={(status) => setStatus(selectedEvent.id, status)}
           />
         ) : (

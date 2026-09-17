@@ -2,7 +2,6 @@ import {
   createContext,
   useCallback,
   useContext,
-  useEffect,
   useMemo,
   useState,
   type ReactNode,
@@ -57,20 +56,6 @@ export function CareEventsProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const selectEvent = useCallback((id: string | null) => setSelectedId(id), []);
-
-  // On desktop the detail panel is a persistent side-by-side column, so
-  // showing it populated by default (like the approved design) reads as
-  // intentional rather than empty. On mobile/tablet it's a full-screen
-  // overlay, so we leave it closed until the caregiver taps something.
-  useEffect(() => {
-    const isDesktop = window.matchMedia("(min-width: 1024px)").matches;
-    if (isDesktop && mockCareEvents.length > 0) {
-      setSelectedId(mockCareEvents[0].id);
-    }
-    // Intentionally run once on mount only - this is an initial-view default,
-    // not a live-resize behavior.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   const toggleSortOrder = useCallback(() => {
     setSortOrder((prev) => (prev === "recent" ? "oldest" : "recent"));

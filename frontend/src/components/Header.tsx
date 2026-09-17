@@ -1,12 +1,13 @@
 import { useState } from "react";
 import { NavLink } from "react-router-dom";
-import { ChevronDown, Search, X } from "lucide-react";
+import { ChevronDown, Clock, Home, Search, UserRound, Users, X } from "lucide-react";
 import { useCareEvents } from "../state/CareEventsContext";
 
 const NAV_ITEMS = [
-  { to: "/", label: "Care", end: true },
-  { to: "/timeline", label: "Timeline", end: false },
-  { to: "/handoff", label: "Handoff", end: false },
+  { to: "/", label: "Home", end: true, icon: Home },
+  { to: "/timeline", label: "Timeline", end: false, icon: Clock },
+  { to: "/handoff", label: "Handoff", end: false, icon: UserRound },
+  { to: "/care-circle", label: "Care Circle", end: false, icon: Users },
 ];
 
 export function Header() {
@@ -19,38 +20,35 @@ export function Header() {
       className="sticky top-0 z-30 border-b bg-[var(--color-ivory)]/90 backdrop-blur"
       style={{ borderColor: "var(--color-line)" }}
     >
-      <div className="mx-auto flex h-16 max-w-6xl items-center gap-6 px-4 sm:px-6">
-        <div className="flex min-w-0 shrink-0 flex-col justify-center leading-none">
-          <span className="font-display text-[19px] text-[var(--color-ink)]">ElderLink</span>
-          <span className="mt-0.5 hidden text-[10.5px] text-[var(--color-ink-muted)] sm:block">
-            Voices. Context. Better Care.
-          </span>
+      <div className="mx-auto flex h-16 max-w-7xl items-center gap-7 px-4 sm:px-6">
+        <div className="flex min-w-0 shrink-0 items-center gap-2">
+          <img src="/assets/logo-mark.png" alt="" aria-hidden="true" className="h-8 w-auto shrink-0" />
+          <div className="flex flex-col justify-center leading-none">
+            <span className="font-display text-[20px] tracking-tight text-[var(--color-ink)]">
+              ElderLink
+            </span>
+            <span className="mt-1 hidden text-[10.5px] tracking-wide text-[var(--color-ink-muted)] sm:block">
+              Together in every chapter
+            </span>
+          </div>
         </div>
 
-        <nav className="hidden items-center gap-1 md:flex" aria-label="Primary">
+        <nav className="hidden items-center gap-1 lg:flex" aria-label="Primary">
           {NAV_ITEMS.map((item) => (
             <NavLink
               key={item.to}
               to={item.to}
               end={item.end}
               className={({ isActive }) =>
-                `relative px-3 py-2 text-[14px] font-medium transition-colors ${
-                  isActive ? "text-[var(--color-ink)]" : "text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]"
+                `flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-[14px] font-medium whitespace-nowrap transition-colors ${
+                  isActive
+                    ? "bg-[var(--color-teal-soft)] text-[var(--color-teal-dark)]"
+                    : "text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]"
                 }`
               }
             >
-              {({ isActive }) => (
-                <>
-                  {item.label}
-                  {isActive && (
-                    <span
-                      className="absolute right-3 -bottom-[1px] left-3 h-[2px] rounded-full"
-                      style={{ backgroundColor: "var(--color-teal)" }}
-                      aria-hidden="true"
-                    />
-                  )}
-                </>
-              )}
+              <item.icon size={15} strokeWidth={2} aria-hidden="true" />
+              {item.label}
             </NavLink>
           ))}
         </nav>
@@ -99,16 +97,15 @@ export function Header() {
               aria-expanded={patientMenuOpen}
               className="flex items-center gap-2 rounded-full py-1 pr-2 pl-1 transition-colors hover:bg-[var(--color-ivory-soft)]"
             >
-              <span
-                className="flex h-8 w-8 items-center justify-center rounded-full font-display text-[13px] text-[var(--color-paper)]"
-                style={{ backgroundColor: "var(--color-routine)" }}
+              <img
+                src="/patient-avatar.svg"
+                alt=""
                 aria-hidden="true"
-              >
-                D
-              </span>
-              <span className="hidden text-left leading-tight sm:block">
-                <span className="block text-[13.5px] font-medium text-[var(--color-ink)]">Dad</span>
-                <span className="block text-[11px] text-[var(--color-ink-muted)]">
+                className="h-9 w-9 shrink-0 rounded-full ring-2 ring-[var(--color-paper)] ring-offset-1 ring-offset-[var(--color-line-soft)]"
+              />
+              <span className="hidden text-left leading-tight lg:block">
+                <span className="block text-[13.5px] font-medium whitespace-nowrap text-[var(--color-ink)]">Dad</span>
+                <span className="block text-[11px] whitespace-nowrap text-[var(--color-ink-muted)]">
                   Age 78 &middot; Living at home
                 </span>
               </span>
@@ -135,28 +132,44 @@ export function Header() {
             )}
           </div>
 
+          <div className="hidden items-center gap-2 border-l pl-3 lg:flex" style={{ borderColor: "var(--color-line)" }}>
+            <span
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[12px] font-semibold text-[var(--color-paper)]"
+              style={{ backgroundColor: "var(--color-teal)" }}
+              aria-hidden="true"
+            >
+              SP
+            </span>
+            <span className="leading-tight whitespace-nowrap">
+              <span className="block text-[13px] font-medium text-[var(--color-ink)]">Hi, Shivaansh</span>
+              <span className="block text-[10.5px] text-[var(--color-ink-muted)]">Caregiver</span>
+            </span>
+          </div>
+
+          {/* Compact caregiver avatar shown below lg, where the full name/role block is hidden for space. */}
           <span
-            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[12px] font-semibold text-[var(--color-ink)]"
-            style={{ backgroundColor: "var(--color-ivory-soft)" }}
-            title="Shivaansh P."
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[12px] font-semibold text-[var(--color-paper)] lg:hidden"
+            style={{ backgroundColor: "var(--color-teal)" }}
+            title="Shivaansh (Caregiver)"
           >
             SP
           </span>
         </div>
       </div>
 
-      <nav className="flex items-center gap-1 overflow-x-auto border-t px-4 py-1.5 md:hidden" style={{ borderColor: "var(--color-line)" }} aria-label="Primary">
+      <nav className="flex items-center gap-1 overflow-x-auto border-t px-4 py-1.5 lg:hidden" style={{ borderColor: "var(--color-line)" }} aria-label="Primary">
         {NAV_ITEMS.map((item) => (
           <NavLink
             key={item.to}
             to={item.to}
             end={item.end}
             className={({ isActive }) =>
-              `rounded-full px-3 py-1.5 text-[13px] font-medium whitespace-nowrap ${
+              `flex items-center gap-1 rounded-full px-3 py-1.5 text-[13px] font-medium whitespace-nowrap ${
                 isActive ? "bg-[var(--color-teal)] text-[var(--color-paper)]" : "text-[var(--color-ink-muted)]"
               }`
             }
           >
+            <item.icon size={13} aria-hidden="true" />
             {item.label}
           </NavLink>
         ))}

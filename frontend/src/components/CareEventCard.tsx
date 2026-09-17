@@ -1,9 +1,10 @@
-import { ChevronRight, Mic } from "lucide-react";
+import { ChevronRight, FileText, Mic } from "lucide-react";
 import clsx from "clsx";
 import type { CareEvent } from "../data/types";
 import { CATEGORY_META } from "../lib/categoryMeta";
 import { formatTimestamp } from "../lib/format";
 import { StatusBadge } from "./StatusBadge";
+import { CaregiverAvatar } from "./CaregiverAvatar";
 
 export function CareEventCard({
   event,
@@ -58,13 +59,26 @@ export function CareEventCard({
           <span className="font-display mt-0.5 block text-[15.5px] leading-snug text-[var(--color-ink)]">
             {event.title}
           </span>
-          <span className="mt-1 flex flex-wrap items-center gap-x-1.5 text-[12.5px] text-[var(--color-ink-muted)]">
-            {event.evidence && (
-              <Mic size={11} className="shrink-0" aria-label="Has voice evidence" />
-            )}
-            <span>{event.reportedBy}</span>
-            <span aria-hidden="true">&middot;</span>
+          <span className="mt-0.5 block truncate text-[13px] text-[var(--color-ink-soft)]">
+            {event.summary}
+          </span>
+          <span className="mt-1.5 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[12px] text-[var(--color-ink-muted)]">
+            <span className="flex items-center gap-1.5">
+              <CaregiverAvatar reportedBy={event.reportedBy} size={16} />
+              {event.reportedBy.split(" ")[0]}
+            </span>
             <span>{formatTimestamp(event.occurredAt)}</span>
+            {event.evidence && (
+              <span className="flex items-center gap-1">
+                <Mic size={11} aria-hidden="true" />
+                Voice note
+              </span>
+            )}
+            {event.evidence && (
+              <span className="flex items-center gap-1">
+                <FileText size={11} aria-hidden="true" />1 evidence item
+              </span>
+            )}
           </span>
         </span>
 

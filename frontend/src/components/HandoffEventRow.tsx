@@ -3,6 +3,7 @@ import type { CareEvent } from "../data/types";
 import { CATEGORY_META } from "../lib/categoryMeta";
 import { formatTimestamp } from "../lib/format";
 import { StatusBadge } from "./StatusBadge";
+import { CaregiverAvatar } from "./CaregiverAvatar";
 
 export function HandoffEventRow({
   event,
@@ -38,8 +39,9 @@ export function HandoffEventRow({
             {event.title}
           </span>
           <span className="mt-1 flex items-center gap-1.5 text-[12px] text-[var(--color-ink-muted)]">
-            {event.evidence && <Mic size={10} aria-label="Has voice evidence" />}
+            <CaregiverAvatar reportedBy={event.reportedBy} size={15} />
             {event.reportedBy} &middot; {formatTimestamp(event.occurredAt)}
+            {event.evidence && <Mic size={10} aria-label="Has voice evidence" />}
           </span>
         </span>
         <StatusBadge status={event.status} size="sm" />

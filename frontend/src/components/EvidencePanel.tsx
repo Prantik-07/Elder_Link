@@ -28,7 +28,7 @@ export function EvidencePanel({
 
   return (
     <div className="flex h-full flex-col">
-      <div className="flex items-start justify-between gap-3 border-b px-5 py-4" style={{ borderColor: "var(--color-line)" }}>
+      <div className="flex items-start justify-between gap-3 border-b px-6 py-[1.125rem]" style={{ borderColor: "var(--color-line)" }}>
         <span
           className="inline-flex items-center gap-2 text-[11px] font-semibold tracking-wide uppercase"
           style={{ color: meta.iconColor }}
@@ -54,12 +54,13 @@ export function EvidencePanel({
         )}
       </div>
 
-      <div className="thin-scroll flex-1 overflow-y-auto px-5 py-5">
-        <h2 className="font-display text-[22px] leading-snug text-[var(--color-ink)]">
+      <div className="thin-scroll flex-1 overflow-y-auto px-6 py-6">
+        <h2 className="font-display text-[24px] leading-[1.25] font-medium text-[var(--color-ink)]">
           {event.title}
         </h2>
+        <p className="mt-1.5 text-[14px] leading-snug text-[var(--color-ink-muted)]">{event.summary}</p>
 
-        <dl className="mt-3 flex flex-wrap gap-x-5 gap-y-1.5 text-[13px] text-[var(--color-ink-muted)]">
+        <dl className="mt-3.5 flex flex-wrap gap-x-5 gap-y-1.5 text-[13px] text-[var(--color-ink-muted)]">
           <div className="flex items-center gap-1.5">
             <Calendar size={13} aria-hidden="true" />
             <dt className="sr-only">When</dt>
@@ -79,7 +80,7 @@ export function EvidencePanel({
           )}
         </dl>
 
-        <section className="mt-5">
+        <section className="mt-6">
           <h3 className="text-[13px] font-semibold text-[var(--color-ink)]">What happened?</h3>
           <p className="mt-1.5 text-[14px] leading-relaxed text-[var(--color-ink-soft)]">
             {event.whatHappened}
@@ -87,7 +88,7 @@ export function EvidencePanel({
         </section>
 
         {event.evidence && (
-          <section className="mt-6">
+          <section className="mt-7">
             <h3 className="text-[13px] font-semibold text-[var(--color-ink)]">
               Evidence from voice note
             </h3>
@@ -111,7 +112,7 @@ export function EvidencePanel({
           </section>
         )}
 
-        <section className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <section className="mt-7 grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div className="rounded-xl border p-3.5" style={{ borderColor: "var(--color-line)" }}>
             <span className="text-[11px] font-semibold tracking-wide text-[var(--color-ink-muted)] uppercase">
               Verification status
@@ -123,7 +124,7 @@ export function EvidencePanel({
           <div className="rounded-xl border p-3.5" style={{ borderColor: "var(--color-line)" }}>
             <span className="flex items-center gap-1.5 text-[11px] font-semibold tracking-wide text-[var(--color-ink-muted)] uppercase">
               <CircleHelp size={12} aria-hidden="true" />
-              Why verification matters
+              Why verification is required
             </span>
             <p className="mt-1.5 text-[13px] leading-snug text-[var(--color-ink-soft)]">{reason}</p>
           </div>
@@ -131,7 +132,7 @@ export function EvidencePanel({
       </div>
 
       <div
-        className="flex flex-wrap items-center gap-2.5 border-t px-5 py-4"
+        className="flex flex-wrap items-center gap-2.5 border-t px-6 py-[1.125rem]"
         style={{ borderColor: "var(--color-line)" }}
       >
         <button

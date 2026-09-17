@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Check, Mic, Square } from "lucide-react";
 import { Modal } from "./Modal";
@@ -40,7 +40,12 @@ function formatSeconds(s: number): string {
   return `${m}:${sec.toString().padStart(2, "0")}`;
 }
 
-export function VoiceRecorder() {
+export function VoiceRecorder({
+  renderTrigger,
+}: {
+  /** Custom trigger UI (e.g. the quick-actions rail's card). Defaults to a small pill button. */
+  renderTrigger?: (onClick: () => void) => ReactNode;
+}) {
   const [open, setOpen] = useState(false);
   const [stage, setStage] = useState<Stage>("idle");
   const [elapsed, setElapsed] = useState(0);
@@ -111,15 +116,19 @@ export function VoiceRecorder() {
 
   return (
     <>
-      <button
-        type="button"
-        onClick={startRecording}
-        className="inline-flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-[13px] font-medium text-[var(--color-ink-soft)] transition-colors hover:border-[var(--color-teal)]/40 hover:text-[var(--color-ink)]"
-        style={{ borderColor: "var(--color-line)" }}
-      >
-        <Mic size={14} aria-hidden="true" />
-        Record voice note
-      </button>
+      {renderTrigger ? (
+        renderTrigger(startRecording)
+      ) : (
+        <button
+          type="button"
+          onClick={startRecording}
+          className="inline-flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-[13px] font-medium text-[var(--color-ink-soft)] transition-colors hover:border-[var(--color-teal)]/40 hover:text-[var(--color-ink)]"
+          style={{ borderColor: "var(--color-line)" }}
+        >
+          <Mic size={14} aria-hidden="true" />
+          Record voice note
+        </button>
+      )}
 
       {open && (
         <Modal onClose={close} titleId="voice-recorder-title">
