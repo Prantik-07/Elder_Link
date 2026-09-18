@@ -10,9 +10,11 @@ from backend.core.persistence import CareEventRepository
 from backend.core.persistence.tests.fake_table import FakeCareEventsTable
 from backend.lambdas.extract_events.handler import (
     extract_note_id_from_transcript_key,
+    get_default_care_recipient_id,
     get_extraction_provider,
     is_transcript_object,
     lambda_handler,
+    resolve_care_recipient_id,
 )
 
 
@@ -186,6 +188,28 @@ class TestTranscriptLoadingFailures:
         assert "Skipped" in result["body"]
 
 
+class TestResolveCareRecipientId:
+    def test_defaults_to_demo_dad_when_unset(self):
+        with patch.dict(os.environ, {}, clear=True):
+            assert get_default_care_recipient_id() == "demo-dad"
+
+    def test_default_is_configurable_via_env_var(self):
+        with patch.dict(os.environ, {"DEFAULT_CARE_RECIPIENT_ID": "demo-mom"}):
+            assert get_default_care_recipient_id() == "demo-mom"
+
+    def test_explicit_care_recipient_id_takes_precedence(self):
+        with patch.dict(os.environ, {"DEFAULT_CARE_RECIPIENT_ID": "demo-dad"}):
+            assert resolve_care_recipient_id({"care_recipient_id": "recipient-42"}) == "recipient-42"
+
+    def test_blank_explicit_care_recipient_id_falls_back_to_default(self):
+        with patch.dict(os.environ, {"DEFAULT_CARE_RECIPIENT_ID": "demo-dad"}):
+            assert resolve_care_recipient_id({"care_recipient_id": "   "}) == "demo-dad"
+
+    def test_missing_field_falls_back_to_default(self):
+        with patch.dict(os.environ, {"DEFAULT_CARE_RECIPIENT_ID": "demo-dad"}):
+            assert resolve_care_recipient_id({}) == "demo-dad"
+
+
 class TestExtractionProviderFailure:
     @patch("backend.lambdas.extract_events.handler.CareEventRepository")
     @patch("backend.lambdas.extract_events.handler.get_extraction_provider")
@@ -305,6 +329,39 @@ class TestEndToEndMockExtraction:
         body = json.loads(result["body"])
         assert body["rejected"] == 0
         assert body["candidates"] == body["accepted"]
+
+
+class TestDemoRecipientGrouping:
+    def test_two_transcripts_without_explicit_recipient_share_one_timeline(self):
+        fake_table = FakeCareEventsTable()
+
+        with patch("backend.lambdas.extract_events.handler.boto3.client") as mock_boto_client, patch(
+            "backend.lambdas.extract_events.handler.CareEventRepository"
+        ) as mock_repo_cls:
+            mock_s3 = MagicMock()
+            mock_boto_client.return_value = mock_s3
+            mock_repo_cls.return_value = CareEventRepository(table=fake_table)
+
+            mock_s3.get_object.return_value = {
+                "Body": MagicMock(read=lambda: transcript_body(note_id="voice-note-1"))
+            }
+            with patch.dict(os.environ, ENV):
+                event = create_s3_event("test-bucket", "transcripts/voice-note-1.json")
+                first = lambda_handler(event, None)
+
+            mock_s3.get_object.return_value = {
+                "Body": MagicMock(read=lambda: transcript_body(note_id="voice-note-2"))
+            }
+            with patch.dict(os.environ, ENV):
+                event = create_s3_event("test-bucket", "transcripts/voice-note-2.json")
+                second = lambda_handler(event, None)
+
+        assert json.loads(first["body"])["care_recipient_id"] == "demo-dad"
+        assert json.loads(second["body"])["care_recipient_id"] == "demo-dad"
+
+        repo = CareEventRepository(table=fake_table)
+        timeline = repo.get_timeline("demo-dad")
+        assert len(timeline) == 8  # 4 events from each of the two voice notes
 
 
 class TestPartialFailureAndRetry:
