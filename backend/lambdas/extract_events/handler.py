@@ -21,11 +21,21 @@ and persist whatever comes out the other end as validated.
 CareContext.care_recipient_id: Day 1's transcript JSON carries no
 patient/care-recipient identifier at all - that concept does not exist yet
 anywhere in this system (confirmed by inspection: no Day 1 code, table, or
-frontend component keys anything by such an id). Until that concept is
-introduced, this Lambda uses the transcript's own note_id as the
-care_recipient_id, i.e. one note = one recipient's timeline. This is a
-known, documented simplification - see the Phase 6 report - not a
-guess made silently.
+frontend component keys anything by such an id), and this phase does not
+introduce accounts, auth, or patient CRUD to fix that properly. Instead:
+if the transcript JSON carries an explicit "care_recipient_id" field, that
+value is used; otherwise this Lambda falls back to the configuration-driven
+DEFAULT_CARE_RECIPIENT_ID env var (see get_default_care_recipient_id).
+This is a deliberate hackathon simplification - not a production identity
+solution - that lets multiple voice notes for the same demo recipient
+(e.g. "demo-dad") land in one longitudinal CareTimelineIndex timeline,
+which one-note-per-recipient (the Phase 6 note_id fallback this replaces)
+could never do. See the Phase 7 report.
+
+Existing DynamoDB items already persisted under the old note_id-as-
+care_recipient_id scheme are not migrated or rewritten by this change -
+they simply keep their existing pk and remain queryable by that same old
+id; only newly processed transcripts pick up the new fallback.
 
 extraction_version: intentionally NOT an independently configurable
 environment variable. backend.core.extraction.identity.assign_event_ids
@@ -82,6 +92,21 @@ def get_extraction_provider() -> ExtractionProvider:
             f"Invalid EXTRACTION_PROVIDER: '{provider_type}'. "
             f"Allowed values: 'mock', 'bedrock'"
         )
+
+
+def get_default_care_recipient_id() -> str:
+    """The hackathon-demo fallback care_recipient_id, used only when a
+    transcript carries no explicit "care_recipient_id" of its own.
+    Configuration-driven (not a string buried in business logic below) so
+    the demo identity can be changed without touching this file."""
+    return os.getenv("DEFAULT_CARE_RECIPIENT_ID", "demo-dad")
+
+
+def resolve_care_recipient_id(transcript_data: dict) -> str:
+    explicit = transcript_data.get("care_recipient_id")
+    if explicit and explicit.strip():
+        return explicit.strip()
+    return get_default_care_recipient_id()
 
 
 def is_transcript_object(object_key: str) -> bool:
@@ -183,7 +208,8 @@ def lambda_handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
         # Only validated CareEvents ever reach the repository - raw
         # candidate dicts and anything RejectedCandidate collected never do.
         repo = CareEventRepository()
-        care_context = CareContext(care_recipient_id=note_id, transcript_id=document.transcript_id)
+        care_recipient_id = resolve_care_recipient_id(transcript_data)
+        care_context = CareContext(care_recipient_id=care_recipient_id, transcript_id=document.transcript_id)
 
         persisted = 0
         for validated_event in pipeline_result.validated_events:
@@ -198,6 +224,7 @@ def lambda_handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
         duration_ms = round((time.monotonic() - start) * 1000, 1)
         summary = {
             "transcript_id": document.transcript_id,
+            "care_recipient_id": care_recipient_id,
             "extraction_version": EXTRACTION_SCHEMA_VERSION,
             "provider": pipeline_result.provider,
             "candidates": len(pipeline_result.validated_events) + len(pipeline_result.rejected),
