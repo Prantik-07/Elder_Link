@@ -1,0 +1,382 @@
+[
+  {
+    "case_id": "01_simple_medication",
+    "document": {
+      "transcript_id": "01_simple_medication",
+      "full_text": "Dad took his blood pressure medicine at 8am.",
+      "segments": [
+        { "segment_id": "s1", "text": "Dad took his blood pressure medicine at 8am." }
+      ]
+    },
+    "expected_events": [
+      {
+        "event_id": "e1",
+        "event_type": "medication",
+        "subject": "Dad",
+        "summary": "Dad took his blood pressure medicine",
+        "claim_stance": "asserted",
+        "source_type": "firsthand",
+        "review_state": "unreviewed",
+        "occurred_at": { "precision": "relative", "expression": "8am" },
+        "evidence": [{ "segment_id": "s1" }]
+      }
+    ],
+    "notes": "Baseline positive case: plain factual medication statement, nothing to hedge, witnessed directly by the speaker."
+  },
+  {
+    "case_id": "02_symptom_observation",
+    "document": {
+      "transcript_id": "02_symptom_observation",
+      "full_text": "Mom seemed a bit more tired than usual this afternoon.",
+      "segments": [
+        { "segment_id": "s1", "text": "Mom seemed a bit more tired than usual this afternoon." }
+      ]
+    },
+    "expected_events": [
+      {
+        "event_id": "e1",
+        "event_type": "observation",
+        "subject": "Mom",
+        "summary": "Mom seemed more tired than usual",
+        "claim_stance": "asserted",
+        "source_type": "firsthand",
+        "review_state": "unreviewed",
+        "occurred_at": { "precision": "relative", "expression": "this afternoon" },
+        "evidence": [{ "segment_id": "s1" }]
+      }
+    ],
+    "notes": "Plain observation, directly witnessed - asserted/firsthand even though 'seemed' describes a subjective impression rather than a hedge about whether it happened. event_type is 'observation' (a general status impression), not 'symptom' (a specific named symptom)."
+  },
+  {
+    "case_id": "03_appointment",
+    "document": {
+      "transcript_id": "03_appointment",
+      "full_text": "Reminder: Dad has a cardiologist appointment next Tuesday at 10am.",
+      "segments": [
+        { "segment_id": "s1", "text": "Reminder: Dad has a cardiologist appointment next Tuesday at 10am." }
+      ]
+    },
+    "expected_events": [
+      {
+        "event_id": "e1",
+        "event_type": "appointment",
+        "subject": "Dad",
+        "summary": "Dad has a cardiologist appointment",
+        "claim_stance": "asserted",
+        "source_type": "firsthand",
+        "review_state": "unreviewed",
+        "occurred_at": { "precision": "relative", "expression": "next Tuesday at 10am" },
+        "evidence": [{ "segment_id": "s1" }]
+      }
+    ],
+    "notes": "Simple future appointment extraction with an explicit relative-time phrase. Not resolved to an absolute date - RELATIVE, not DATE."
+  },
+  {
+    "case_id": "04_multiple_events",
+    "document": {
+      "transcript_id": "04_multiple_events",
+      "full_text": "Dad took his morning pills around 8. Also, don't forget he has his eye doctor appointment on Friday.",
+      "segments": [
+        { "segment_id": "s1", "text": "Dad took his morning pills around 8." },
+        { "segment_id": "s2", "text": "Also, don't forget he has his eye doctor appointment on Friday." }
+      ]
+    },
+    "expected_events": [
+      {
+        "event_id": "e1",
+        "event_type": "medication",
+        "subject": "Dad",
+        "summary": "Dad took his morning pills",
+        "claim_stance": "asserted",
+        "source_type": "firsthand",
+        "review_state": "unreviewed",
+        "occurred_at": { "precision": "relative", "expression": "around 8" },
+        "evidence": [{ "segment_id": "s1" }]
+      },
+      {
+        "event_id": "e2",
+        "event_type": "appointment",
+        "subject": "Dad",
+        "summary": "Dad has an eye doctor appointment",
+        "claim_stance": "asserted",
+        "source_type": "firsthand",
+        "review_state": "unreviewed",
+        "occurred_at": { "precision": "relative", "expression": "Friday" },
+        "evidence": [{ "segment_id": "s2" }]
+      }
+    ],
+    "notes": "Two independent events in one note, each grounded in its own segment. Extractor must not merge or drop either."
+  },
+  {
+    "case_id": "05_uncertain_firsthand",
+    "document": {
+      "transcript_id": "05_uncertain_firsthand",
+      "full_text": "I think Dad may have missed his morning medicine.",
+      "segments": [
+        { "segment_id": "s1", "text": "I think Dad may have missed his morning medicine." }
+      ]
+    },
+    "expected_events": [
+      {
+        "event_id": "e1",
+        "event_type": "medication",
+        "subject": "Dad",
+        "summary": "Dad may have missed his morning medicine",
+        "claim_stance": "uncertain",
+        "source_type": "firsthand",
+        "review_state": "needs_verification",
+        "verification_reason": {"code": "explicit_uncertainty"},
+        "occurred_at": { "precision": "relative", "expression": "morning" },
+        "evidence": [{ "segment_id": "s1" }]
+      }
+    ],
+    "notes": "SAFETY CASE: must not collapse 'I think ... may have missed' into a flat 'Dad missed his medicine' fact (claim_stance=asserted). The speaker witnessed this themselves (firsthand) but is hedging (uncertain) - these are independent axes."
+  },
+  {
+    "case_id": "06_ambiguous_statement",
+    "document": {
+      "transcript_id": "06_ambiguous_statement",
+      "full_text": "Dad wasn't really feeling like himself today.",
+      "segments": [
+        { "segment_id": "s1", "text": "Dad wasn't really feeling like himself today." }
+      ]
+    },
+    "expected_events": [
+      {
+        "event_id": "e1",
+        "event_type": "observation",
+        "subject": "Dad",
+        "summary": "Dad wasn't feeling like himself",
+        "claim_stance": "uncertain",
+        "source_type": "firsthand",
+        "review_state": "needs_verification",
+        "verification_reason": {"code": "explicit_uncertainty"},
+        "occurred_at": { "precision": "relative", "expression": "today" },
+        "evidence": [{ "segment_id": "s1" }]
+      }
+    ],
+    "notes": "Vague, non-specific complaint with no named symptom. Failure mode: extractor invents a specific diagnosis or symptom (e.g. 'nausea') that was never stated - stays event_type=observation, not symptom."
+  },
+  {
+    "case_id": "07_no_care_event",
+    "document": {
+      "transcript_id": "07_no_care_event",
+      "full_text": "Hey, just checking in, hope you're having a good day!",
+      "segments": [
+        { "segment_id": "s1", "text": "Hey, just checking in, hope you're having a good day!" }
+      ]
+    },
+    "expected_events": [],
+    "notes": "Purely social, no care-relevant content. Expected event set is empty; any generated event here is a hallucination."
+  },
+  {
+    "case_id": "08_negative_statement",
+    "document": {
+      "transcript_id": "08_negative_statement",
+      "full_text": "No, Dad did not miss his medication today, I already checked.",
+      "segments": [
+        { "segment_id": "s1", "text": "No, Dad did not miss his medication today, I already checked." }
+      ]
+    },
+    "expected_events": [
+      {
+        "event_id": "e1",
+        "event_type": "medication",
+        "subject": "Dad",
+        "summary": "Dad did not miss his medication",
+        "claim_stance": "negated",
+        "source_type": "firsthand",
+        "review_state": "unreviewed",
+        "occurred_at": { "precision": "relative", "expression": "today" },
+        "evidence": [{ "segment_id": "s1" }]
+      }
+    ],
+    "notes": "SAFETY CASE: a confirmed negation is itself real, worth-keeping information (claim_stance=negated), not an empty event set. A generated event on the same evidence that instead asserts the medication WAS missed must collide with this event during matching (same type/subject/evidence) and be caught as a claim_stance contradiction."
+  },
+  {
+    "case_id": "09_conflicting_information",
+    "document": {
+      "transcript_id": "09_conflicting_information",
+      "full_text": "Dad took his medicine at 8am. Actually wait, I'm not sure he did take it, now that I think about it.",
+      "segments": [
+        { "segment_id": "s1", "text": "Dad took his medicine at 8am." },
+        { "segment_id": "s2", "text": "Actually wait, I'm not sure he did take it, now that I think about it." }
+      ]
+    },
+    "expected_events": [
+      {
+        "event_id": "e1",
+        "event_type": "medication",
+        "subject": "Dad",
+        "summary": "Dad took his medicine at 8am",
+        "claim_stance": "asserted",
+        "source_type": "firsthand",
+        "review_state": "unreviewed",
+        "occurred_at": { "precision": "relative", "expression": "8am" },
+        "evidence": [{ "segment_id": "s1" }]
+      },
+      {
+        "event_id": "e2",
+        "event_type": "medication",
+        "subject": "Dad",
+        "summary": "Speaker is no longer sure Dad took his medicine, retracting the earlier claim",
+        "claim_stance": "uncertain",
+        "source_type": "firsthand",
+        "review_state": "needs_verification",
+        "verification_reason": {"code": "conflicting_information"},
+        "occurred_at": { "precision": "unknown" },
+        "evidence": [{ "segment_id": "s2" }]
+      }
+    ],
+    "notes": "The speaker contradicts themselves within the same note. This is represented as TWO separate events - an asserted claim and a later uncertain retraction - rather than a single event with an invalid 'contradicted' stance. The conflict between e1 and e2 is a relationship between two events, not a property of one."
+  },
+  {
+    "case_id": "10_attribution_asserted_secondhand",
+    "document": {
+      "transcript_id": "10_attribution_asserted_secondhand",
+      "full_text": "My sister told me Dad fell yesterday evening in the kitchen.",
+      "segments": [
+        { "segment_id": "s1", "text": "My sister told me Dad fell yesterday evening in the kitchen." }
+      ]
+    },
+    "expected_events": [
+      {
+        "event_id": "e1",
+        "event_type": "concern",
+        "subject": "Dad",
+        "summary": "Dad fell in the kitchen, as reported by sister",
+        "claim_stance": "asserted",
+        "source_type": "secondhand",
+        "review_state": "needs_verification",
+        "verification_reason": {"code": "secondhand_report"},
+        "occurred_at": { "precision": "relative", "expression": "yesterday evening" },
+        "reported_by": "sister",
+        "evidence": [{ "segment_id": "s1" }]
+      }
+    ],
+    "notes": "SAFETY CASE: the sister states this as fact (asserted, not hedged), but the note's own speaker did not witness it - source_type=secondhand and reported_by='sister' capture that independently of claim_stance. Losing either axis loses safety-relevant information."
+  },
+  {
+    "case_id": "11_relative_time",
+    "document": {
+      "transcript_id": "11_relative_time",
+      "full_text": "Dad has a doctor's appointment in two days.",
+      "segments": [
+        { "segment_id": "s1", "text": "Dad has a doctor's appointment in two days." }
+      ]
+    },
+    "expected_events": [
+      {
+        "event_id": "e1",
+        "event_type": "appointment",
+        "subject": "Dad",
+        "summary": "Dad has a doctor's appointment",
+        "claim_stance": "asserted",
+        "source_type": "firsthand",
+        "review_state": "unreviewed",
+        "occurred_at": { "precision": "relative", "expression": "in two days" },
+        "evidence": [{ "segment_id": "s1" }]
+      }
+    ],
+    "notes": "Relative time expression preserved as-is; evaluator must not require resolution to an absolute calendar date (precision stays RELATIVE, never DATE)."
+  },
+  {
+    "case_id": "12_irrelevant_casual",
+    "document": {
+      "transcript_id": "12_irrelevant_casual",
+      "full_text": "Ha, that's so funny. Anyway, talk to you later!",
+      "segments": [
+        { "segment_id": "s1", "text": "Ha, that's so funny. Anyway, talk to you later!" }
+      ]
+    },
+    "expected_events": [],
+    "notes": "Casual chatter with no care content, similar in spirit to case 07 but phrased as a conversational aside rather than a greeting."
+  },
+  {
+    "case_id": "13_incomplete_voice_note",
+    "document": {
+      "transcript_id": "13_incomplete_voice_note",
+      "full_text": "Dad's blood pres-",
+      "segments": [
+        { "segment_id": "s1", "text": "Dad's blood pres-" }
+      ]
+    },
+    "expected_events": [],
+    "notes": "Voice note cut off mid-word/mid-thought. Failure mode: extractor completes the thought itself (e.g. invents a blood pressure reading or a 'vital recorded' event) instead of recognizing there isn't enough information."
+  },
+  {
+    "case_id": "14_evidence_multi_segment",
+    "document": {
+      "transcript_id": "14_evidence_multi_segment",
+      "full_text": "Mom's appointment got moved. It's now on Thursday instead of Monday.",
+      "segments": [
+        { "segment_id": "s1", "text": "Mom's appointment got moved." },
+        { "segment_id": "s2", "text": "It's now on Thursday instead of Monday." }
+      ]
+    },
+    "expected_events": [
+      {
+        "event_id": "e1",
+        "event_type": "appointment",
+        "subject": "Mom",
+        "summary": "Mom's appointment was rescheduled to Thursday",
+        "claim_stance": "asserted",
+        "source_type": "firsthand",
+        "review_state": "unreviewed",
+        "occurred_at": { "precision": "relative", "expression": "Thursday" },
+        "evidence": [{ "segment_id": "s1" }, { "segment_id": "s2" }]
+      }
+    ],
+    "notes": "Single event whose full meaning only emerges from combining two segments; neither segment alone contains the complete fact, so both must be cited as evidence."
+  },
+  {
+    "case_id": "15_unsupported_causal_inference",
+    "document": {
+      "transcript_id": "15_unsupported_causal_inference",
+      "full_text": "She seemed tired after the medication.",
+      "segments": [
+        { "segment_id": "s1", "text": "She seemed tired after the medication." }
+      ]
+    },
+    "expected_events": [
+      {
+        "event_id": "e1",
+        "event_type": "observation",
+        "subject": "She",
+        "summary": "She seemed tired after taking the medication",
+        "claim_stance": "asserted",
+        "source_type": "firsthand",
+        "review_state": "unreviewed",
+        "occurred_at": { "precision": "unknown" },
+        "evidence": [{ "segment_id": "s1" }]
+      }
+    ],
+    "notes": "SAFETY CASE: the note states temporal sequence ('after'), not causation. Expected summary preserves the observed sequence only. Failure mode: extractor emits a causal claim like 'medication caused fatigue' - that is an unsupported inference the source never made."
+  },
+  {
+    "case_id": "16_uncertain_secondhand",
+    "document": {
+      "transcript_id": "16_uncertain_secondhand",
+      "full_text": "My sister thinks Dad may have missed his medication this morning.",
+      "segments": [
+        { "segment_id": "s1", "text": "My sister thinks Dad may have missed his medication this morning." }
+      ]
+    },
+    "expected_events": [
+      {
+        "event_id": "e1",
+        "event_type": "medication",
+        "subject": "Dad",
+        "summary": "Dad may have missed his medication this morning, per sister's uncertain impression",
+        "claim_stance": "uncertain",
+        "source_type": "secondhand",
+        "review_state": "needs_verification",
+        "verification_reason": {"code": "secondhand_report"},
+        "occurred_at": { "precision": "relative", "expression": "this morning" },
+        "reported_by": "sister",
+        "evidence": [{ "segment_id": "s1" }]
+      }
+    ],
+    "notes": "SAFETY CASE: claim_stance and source_type must coexist independently - the sister relays her OWN hedge ('thinks ... may have'), so this is uncertain AND secondhand at once. Collapsing to just one axis loses real information."
+  }
+]

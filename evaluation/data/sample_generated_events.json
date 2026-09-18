@@ -1,0 +1,170 @@
+{
+  "_comment": "NOT a real extractor. A hand-written stand-in output used to demonstrate the evaluation harness end-to-end (all five verdicts appear, plus evidence precision/recall/validity behavior). Deliberately includes the exact BAD failure patterns from Phase 1 Step 6, plus subject-safety, invalid-evidence-id and extra-valid-evidence scenarios, expressed with the Phase 2 canonical schema. Replace with real extractor output once one exists.",
+
+  "01_simple_medication": [
+    {
+      "event_id": "g1",
+      "event_type": "medication",
+      "subject": "Dad",
+      "summary": "Dad took his blood pressure medicine",
+      "claim_stance": "asserted",
+      "source_type": "firsthand",
+      "review_state": "unreviewed",
+      "occurred_at": { "precision": "relative", "expression": "8am" },
+      "evidence": [{ "segment_id": "s1" }]
+    }
+  ],
+  "02_symptom_observation": [
+    {
+      "event_id": "g1",
+      "event_type": "observation",
+      "subject": "Dad",
+      "summary": "Mom seemed more tired than usual",
+      "claim_stance": "asserted",
+      "source_type": "firsthand",
+      "review_state": "unreviewed",
+      "occurred_at": { "precision": "relative", "expression": "this afternoon" },
+      "evidence": [{ "segment_id": "s1" }]
+    }
+  ],
+  "03_appointment": [
+    {
+      "event_id": "g1",
+      "event_type": "appointment",
+      "subject": "Dad",
+      "summary": "Dad has a cardiologist appointment",
+      "claim_stance": "asserted",
+      "source_type": "firsthand",
+      "review_state": "unreviewed",
+      "occurred_at": { "precision": "relative", "expression": "next Tuesday at 10am" },
+      "evidence": [{ "segment_id": "s1" }, { "segment_id": "s99" }]
+    }
+  ],
+  "04_multiple_events": [
+    {
+      "event_id": "g1",
+      "event_type": "medication",
+      "subject": "Dad",
+      "summary": "Dad took his morning pills",
+      "claim_stance": "asserted",
+      "source_type": "firsthand",
+      "review_state": "unreviewed",
+      "occurred_at": { "precision": "relative", "expression": "around 8" },
+      "evidence": [{ "segment_id": "s1" }]
+    },
+    {
+      "event_id": "g2",
+      "event_type": "appointment",
+      "subject": "Dad",
+      "summary": "Dad has an eye doctor appointment",
+      "claim_stance": "asserted",
+      "source_type": "firsthand",
+      "review_state": "unreviewed",
+      "occurred_at": { "precision": "relative", "expression": "Friday" },
+      "evidence": [{ "segment_id": "s1" }, { "segment_id": "s2" }]
+    }
+  ],
+  "05_uncertain_firsthand": [
+    {
+      "event_id": "g1",
+      "event_type": "medication",
+      "subject": "Dad",
+      "summary": "Dad missed his medicine",
+      "claim_stance": "asserted",
+      "source_type": "firsthand",
+      "review_state": "unreviewed",
+      "occurred_at": { "precision": "relative", "expression": "morning" },
+      "evidence": [{ "segment_id": "s1" }]
+    }
+  ],
+  "06_ambiguous_statement": [
+    {
+      "event_id": "g1",
+      "event_type": "observation",
+      "subject": "Dad",
+      "summary": "Dad may have nausea",
+      "claim_stance": "uncertain",
+      "source_type": "firsthand",
+      "review_state": "needs_verification",
+      "occurred_at": { "precision": "relative", "expression": "today" },
+      "evidence": [{ "segment_id": "s1" }]
+    }
+  ],
+  "07_no_care_event": [
+    {
+      "event_id": "g1",
+      "event_type": "observation",
+      "subject": "Dad",
+      "summary": "Dad is doing fine",
+      "claim_stance": "asserted",
+      "source_type": "firsthand",
+      "review_state": "unreviewed",
+      "occurred_at": { "precision": "unknown" },
+      "evidence": [{ "segment_id": "s1" }]
+    }
+  ],
+  "08_negative_statement": [
+    {
+      "event_id": "g1",
+      "event_type": "medication",
+      "subject": "Dad",
+      "summary": "Dad missed his medication",
+      "claim_stance": "asserted",
+      "source_type": "firsthand",
+      "review_state": "unreviewed",
+      "occurred_at": { "precision": "relative", "expression": "today" },
+      "evidence": [{ "segment_id": "s1" }]
+    }
+  ],
+  "09_conflicting_information": [
+    {
+      "event_id": "g1",
+      "event_type": "medication",
+      "subject": "Dad",
+      "summary": "Dad took his medicine at 8am",
+      "claim_stance": "asserted",
+      "source_type": "firsthand",
+      "review_state": "unreviewed",
+      "occurred_at": { "precision": "relative", "expression": "8am" },
+      "evidence": [{ "segment_id": "s1" }]
+    }
+  ],
+  "10_attribution_asserted_secondhand": [
+    {
+      "event_id": "g1",
+      "event_type": "concern",
+      "subject": "Dad",
+      "summary": "Dad fell in the kitchen",
+      "claim_stance": "asserted",
+      "source_type": "firsthand",
+      "review_state": "unreviewed",
+      "occurred_at": { "precision": "relative", "expression": "yesterday evening" },
+      "reported_by": null,
+      "evidence": [{ "segment_id": "s1" }]
+    }
+  ],
+  "15_unsupported_causal_inference": [
+    {
+      "event_id": "g1",
+      "event_type": "observation",
+      "subject": "She",
+      "summary": "She seemed tired after taking the medication",
+      "claim_stance": "asserted",
+      "source_type": "firsthand",
+      "review_state": "unreviewed",
+      "occurred_at": { "precision": "unknown" },
+      "evidence": [{ "segment_id": "s1" }]
+    },
+    {
+      "event_id": "g2",
+      "event_type": "concern",
+      "subject": "She",
+      "summary": "The medication caused her fatigue",
+      "claim_stance": "asserted",
+      "source_type": "firsthand",
+      "review_state": "unreviewed",
+      "occurred_at": { "precision": "unknown" },
+      "evidence": [{ "segment_id": "s1" }]
+    }
+  ]
+}
