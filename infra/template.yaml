@@ -163,6 +163,10 @@ Resources:
           EXTRACTION_PROVIDER: mock
           ELDERLINK_AWS_REGION: us-east-1
           BEDROCK_EXTRACTION_MODEL_ID: anthropic.claude-3-5-sonnet-20241022-v2:0
+          # Phase 7: hackathon-demo care-recipient identity fallback, used
+          # only when a transcript carries no explicit care_recipient_id
+          # of its own. See backend/lambdas/extract_events/handler.py.
+          DEFAULT_CARE_RECIPIENT_ID: demo-dad
       # NOTE: same reasoning as ProcessAudioFunction above - the trigger is
       # wired via the explicit TranscriptCreatedEventBridgeRule +
       # ExtractEventsInvokePermission resources below, not a SAM `Events:`
@@ -314,6 +318,82 @@ Resources:
           Projection:
             ProjectionType: ALL
 
+  # Phase 7 (Day 3): the smallest read-only API the frozen frontend needs -
+  # one Lambda backing one route, fronted by an HTTP API (not a REST API -
+  # no request/response mapping templates or usage plans are needed for a
+  # single unauthenticated read route, and HTTP APIs are cheaper/simpler).
+  # DEMO-ONLY: no authorizer is attached - see GetTimelineFunction's
+  # handler docstring for why that's acceptable here and not in production.
+  GetTimelineFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: elderlink-get-timeline
+      CodeUri: ../backend/lambdas/get_timeline/
+      Handler: handler.lambda_handler
+      Role: !GetAtt GetTimelineRole.Arn
+      Layers:
+        - !Ref ExtractionLayer
+      Environment:
+        Variables:
+          CARE_EVENTS_TABLE_NAME: !Ref CareEventsTable
+          ELDERLINK_AWS_REGION: us-east-1
+          # Demo-only CORS: the Vite dev server origin by default. Override
+          # per deployment (e.g. a deployed frontend's real origin) rather
+          # than widening this to "*" once real user data is involved.
+          ELDERLINK_CORS_ORIGIN: http://localhost:5173
+      Events:
+        GetTimeline:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref CareEventsHttpApi
+            Path: /care-recipients/{care_recipient_id}/timeline
+            Method: GET
+
+  GetTimelineRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: ElderLinkGetTimelineDynamoDbReadAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              # Read-only, least-privilege: Query only (CareEventRepository.
+              # get_timeline), against the base table and its
+              # CareTimelineIndex LSI - never PutItem/UpdateItem/DeleteItem,
+              # and this function never scans.
+              - Effect: Allow
+                Action:
+                  - dynamodb:Query
+                Resource:
+                  - !GetAtt CareEventsTable.Arn
+                  - !Sub ${CareEventsTable.Arn}/index/CareTimelineIndex
+
+  # CORS is also configured at the HTTP API level (in addition to the
+  # headers GetTimelineFunction itself returns) so OPTIONS preflight
+  # requests are answered by API Gateway directly, without invoking the
+  # Lambda at all.
+  CareEventsHttpApi:
+    Type: AWS::Serverless::HttpApi
+    Properties:
+      Name: elderlink-care-events-api
+      CorsConfiguration:
+        AllowOrigins:
+          - http://localhost:5173
+        AllowMethods:
+          - GET
+          - OPTIONS
+        AllowHeaders:
+          - Content-Type
+
 Outputs:
   AudioBucketName:
     Description: Name of the S3 bucket for audio uploads and transcripts
@@ -356,3 +436,15 @@ Outputs:
     Value: !Ref TranscriptCreatedEventBridgeRule
     Export:
       Name: ElderLink-TranscriptCreatedEventBridgeRuleName
+
+  GetTimelineFunctionName:
+    Description: Name of the GetTimeline read-API Lambda function
+    Value: !Ref GetTimelineFunction
+    Export:
+      Name: ElderLink-GetTimelineFunctionName
+
+  CareEventsApiUrl:
+    Description: Base URL of the CareEvents read API (demo-only, unauthenticated) - set as VITE_ELDERLINK_API_URL for the frontend
+    Value: !Sub https://${CareEventsHttpApi}.execute-api.${AWS::Region}.amazonaws.com
+    Export:
+      Name: ElderLink-CareEventsApiUrl
