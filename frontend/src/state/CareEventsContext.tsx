@@ -2,10 +2,12 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useState,
   type ReactNode,
 } from "react";
+import { fetchCareEventTimeline, USE_MOCK_DATA } from "../data/api";
 import { mockCareEvents } from "../data/mockEvents";
 import type { CareEvent, CareEventStatus } from "../data/types";
 
@@ -20,6 +22,8 @@ export type SortOrder = "recent" | "oldest";
 
 interface CareEventsContextValue {
   events: CareEvent[];
+  isLoading: boolean;
+  error: string | null;
   filter: CareFilter;
   setFilter: (filter: CareFilter) => void;
   sortOrder: SortOrder;
@@ -37,7 +41,9 @@ interface CareEventsContextValue {
 const CareEventsContext = createContext<CareEventsContextValue | null>(null);
 
 export function CareEventsProvider({ children }: { children: ReactNode }) {
-  const [events, setEvents] = useState<CareEvent[]>(mockCareEvents);
+  const [events, setEvents] = useState<CareEvent[]>(USE_MOCK_DATA ? mockCareEvents : []);
+  const [isLoading, setIsLoading] = useState(!USE_MOCK_DATA);
+  const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<CareFilter>("all");
   const [sortOrder, setSortOrder] = useState<SortOrder>("recent");
   const [search, setSearch] = useState("");
@@ -45,6 +51,38 @@ export function CareEventsProvider({ children }: { children: ReactNode }) {
   // full-screen overlay, so auto-selecting one on load would trap the user
   // behind it before they ever see the list.
   const [selectedId, setSelectedId] = useState<string | null>(null);
+
+  // The context is the single event source for the whole app (Care
+  // Overview, Timeline, Handoff all read from it) - fetching here, once,
+  // is what keeps every page from independently requesting the same
+  // timeline and racing/duplicating requests.
+  useEffect(() => {
+    if (USE_MOCK_DATA) return;
+
+    let cancelled = false;
+    setIsLoading(true);
+    setError(null);
+
+    fetchCareEventTimeline()
+      .then((fetched) => {
+        if (cancelled) return;
+        setEvents(fetched);
+      })
+      .catch((err: unknown) => {
+        if (cancelled) return;
+        // A real API/backend failure must be visible, not silently
+        // swallowed into an empty or mock timeline - an empty list here
+        // would be indistinguishable from a legitimately empty timeline.
+        setError(err instanceof Error ? err.message : "Failed to load care events.");
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const setStatus = useCallback((id: string, status: CareEventStatus) => {
     setEvents((prev) => prev.map((e) => (e.id === id ? { ...e, status } : e)));
@@ -96,6 +134,8 @@ export function CareEventsProvider({ children }: { children: ReactNode }) {
 
   const value: CareEventsContextValue = {
     events,
+    isLoading,
+    error,
     filter,
     setFilter,
     sortOrder,

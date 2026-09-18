@@ -19,8 +19,17 @@ function groupByDay(events: CareEvent[]): { label: string; items: CareEvent[] }[
 }
 
 export function TimelinePage() {
-  const { visibleEvents, filter, setFilter, sortOrder, toggleSortOrder, selectedId, selectEvent } =
-    useCareEvents();
+  const {
+    visibleEvents,
+    isLoading,
+    error,
+    filter,
+    setFilter,
+    sortOrder,
+    toggleSortOrder,
+    selectedId,
+    selectEvent,
+  } = useCareEvents();
 
   const groups = useMemo(() => groupByDay(visibleEvents), [visibleEvents]);
 
@@ -41,7 +50,11 @@ export function TimelinePage() {
           onToggleSort={toggleSortOrder}
         />
 
-        {groups.length === 0 ? (
+        {isLoading ? (
+          <EmptyState message="Loading care events..." />
+        ) : error ? (
+          <EmptyState message={`Couldn't load care events: ${error}`} />
+        ) : groups.length === 0 ? (
           <EmptyState message="No updates match this filter yet." />
         ) : (
           <div className="flex flex-col gap-7">

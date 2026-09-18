@@ -21,7 +21,7 @@ const UPCOMING_ITEMS = [
 ];
 
 export function HandoffPage() {
-  const { events, selectEvent } = useCareEvents();
+  const { events, isLoading, error, selectEvent } = useCareEvents();
   const [reviewOpen, setReviewOpen] = useState(false);
   const [confirmed, setConfirmed] = useState(false);
 
@@ -41,6 +41,19 @@ export function HandoffPage() {
     setConfirmed(false);
     setReviewOpen(true);
   };
+
+  if (isLoading || error) {
+    return (
+      <CareDetailLayout>
+        <div className="flex flex-col gap-8">
+          <h1 className="font-display text-[28px] text-[var(--color-ink)]">Handoff</h1>
+          <EmptyState
+            message={isLoading ? "Loading care events..." : `Couldn't load care events: ${error}`}
+          />
+        </div>
+      </CareDetailLayout>
+    );
+  }
 
   return (
     <CareDetailLayout>

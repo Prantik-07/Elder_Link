@@ -11,8 +11,17 @@ import { timeOfDayGreeting } from "../lib/greeting";
 import { LAST_HANDOFF_LABEL } from "../lib/handoff";
 
 export function CarePage() {
-  const { visibleEvents, filter, setFilter, sortOrder, toggleSortOrder, selectedId, selectEvent } =
-    useCareEvents();
+  const {
+    visibleEvents,
+    isLoading,
+    error,
+    filter,
+    setFilter,
+    sortOrder,
+    toggleSortOrder,
+    selectedId,
+    selectEvent,
+  } = useCareEvents();
 
   return (
     <div className="mx-auto max-w-[1400px] px-6 py-7 sm:px-8 lg:py-9 xl:px-10">
@@ -58,7 +67,11 @@ export function CarePage() {
           </div>
 
           <div className="mt-6">
-            {visibleEvents.length === 0 ? (
+            {isLoading ? (
+              <EmptyState message="Loading care events..." />
+            ) : error ? (
+              <EmptyState message={`Couldn't load care events: ${error}`} />
+            ) : visibleEvents.length === 0 ? (
               <EmptyState message="No updates match this filter yet." />
             ) : (
               <>
