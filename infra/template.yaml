@@ -131,6 +131,189 @@ Resources:
       Principal: events.amazonaws.com
       SourceArn: !GetAtt EventBridgeRule.Arn
 
+  # Phase 6 (Day 2): extraction Lambda layer, bundling backend/core/
+  # {care_event,extraction,persistence} (regenerate with
+  # infra/build_extraction_layer.sh before packaging/deploying). Kept as a
+  # separate layer from TranscriptionLayer since it has a different source
+  # tree and update cadence, and ExtractEventsFunction has no need for
+  # TranscriptionProvider/VoxtralProvider at all.
+  ExtractionLayer:
+    Type: AWS::Serverless::LayerVersion
+    Properties:
+      LayerName: elderlink-extraction-core
+      Description: ElderLink extraction core modules (care_event schema, ExtractionProvider, CareEventRepository)
+      ContentUri: ../backend/layers/extraction/
+      CompatibleRuntimes:
+        - python3.11
+      RetentionPolicy: Retain
+
+  ExtractEventsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: elderlink-extract-events
+      CodeUri: ../backend/lambdas/extract_events/
+      Handler: handler.lambda_handler
+      Role: !GetAtt ExtractEventsRole.Arn
+      Layers:
+        - !Ref ExtractionLayer
+      Environment:
+        Variables:
+          TRANSCRIPT_BUCKET_NAME: !Ref AudioBucket
+          CARE_EVENTS_TABLE_NAME: !Ref CareEventsTable
+          EXTRACTION_PROVIDER: mock
+          ELDERLINK_AWS_REGION: us-east-1
+          BEDROCK_EXTRACTION_MODEL_ID: anthropic.claude-3-5-sonnet-20241022-v2:0
+      # NOTE: same reasoning as ProcessAudioFunction above - the trigger is
+      # wired via the explicit TranscriptCreatedEventBridgeRule +
+      # ExtractEventsInvokePermission resources below, not a SAM `Events:`
+      # block, to avoid a second auto-generated rule double-invoking this
+      # function per transcript write.
+
+  ExtractEventsRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: ElderLinkExtractionS3Access
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                Resource: !Sub ${AudioBucket.Arn}/transcripts/*
+        - PolicyName: ElderLinkExtractionDynamoDbAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              # UpdateItem only - CareEventRepository.put_event is the only
+              # DynamoDB operation this function performs. Indexes
+              # (CareTimelineIndex, TranscriptIndex) are maintained
+              # automatically by DynamoDB on the base-table write and need
+              # no separate write permission; this function never queries.
+              - Effect: Allow
+                Action:
+                  - dynamodb:UpdateItem
+                Resource: !GetAtt CareEventsTable.Arn
+        - PolicyName: ElderLinkExtractionBedrockAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              # Scoped identically to ProcessAudioRole's Bedrock access -
+              # granted so the code path isn't blocked purely by IAM once
+              # Bedrock access is verified, but EXTRACTION_PROVIDER=mock
+              # remains the only path actually exercised (see
+              # backend/core/extraction/bedrock.py).
+              - Effect: Allow
+                Action:
+                  - bedrock:InvokeModel
+                Resource: !Sub arn:aws:bedrock:us-east-1::foundation-model/anthropic.claude-3-5-sonnet-20241022-v2:0
+
+  # Filtered to the transcripts/ prefix only (never audio/, never anything
+  # this function itself could produce, since it writes only to DynamoDB) -
+  # the same duplicate-trigger hazard noted on EventBridgeRule above is why
+  # this stays narrow rather than a generic "any Object Created" rule.
+  TranscriptCreatedEventBridgeRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Name: elderlink-s3-transcript-created
+      Description: Routes S3 Object Created events for transcripts/ prefix to ExtractEvents Lambda
+      EventPattern:
+        source:
+          - aws.s3
+        detail-type:
+          - Object Created
+        detail:
+          bucket:
+            name:
+              - !Ref AudioBucket
+          object:
+            key:
+              - prefix: transcripts/
+      State: ENABLED
+      Targets:
+        - Arn: !GetAtt ExtractEventsFunction.Arn
+          Id: ExtractEventsFunction
+
+  ExtractEventsInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref ExtractEventsFunction
+      Action: lambda:InvokeFunction
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt TranscriptCreatedEventBridgeRule.Arn
+
+  # Phase 5 (Day 2): persists only VALIDATED CareEvents produced by
+  # backend/core/persistence.CareEventRepository. As of Phase 6,
+  # ExtractEventsFunction above is the writer.  See
+  # backend/core/persistence/keys.py for the full key-design rationale;
+  # this resource is a direct implementation of it.
+  CareEventsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: elderlink-care-events
+      BillingMode: PAY_PER_REQUEST
+      SSESpecification:
+        SSEEnabled: true
+      AttributeDefinitions:
+        # Only key attributes are declared here - DynamoDB is schemaless
+        # for every other item attribute (event_type, subject, summary,
+        # claim_stance, occurred_at, evidence, ...).
+        - AttributeName: pk
+          AttributeType: S
+        - AttributeName: sk
+          AttributeType: S
+        - AttributeName: created_at
+          AttributeType: S
+        - AttributeName: transcript_id
+          AttributeType: S
+        - AttributeName: event_id
+          AttributeType: S
+      KeySchema:
+        # pk = PATIENT#<care_recipient_id>, sk = EVENT#<event_id> (the
+        # Phase 4.1 deterministic identity) - this is what makes a repeated
+        # write of the same logical event an idempotent upsert rather than
+        # a new row.
+        - AttributeName: pk
+          KeyType: HASH
+        - AttributeName: sk
+          KeyType: RANGE
+      LocalSecondaryIndexes:
+        # Access pattern A: care events for one recipient, newest first.
+        # Same partition key as the base table, sorted by created_at
+        # instead of event_id - an LSI, not a GSI, since only the sort
+        # order needs to differ.
+        - IndexName: CareTimelineIndex
+          KeySchema:
+            - AttributeName: pk
+              KeyType: HASH
+            - AttributeName: created_at
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+      GlobalSecondaryIndexes:
+        # Access pattern B: events generated from one transcript. Requires
+        # a full GSI (not an LSI) because its partition key (transcript_id)
+        # differs from the base table's (care_recipient_id) - the one GSI
+        # this phase adds, justified by that specific, explicitly required
+        # access pattern.
+        - IndexName: TranscriptIndex
+          KeySchema:
+            - AttributeName: transcript_id
+              KeyType: HASH
+            - AttributeName: event_id
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+
 Outputs:
   AudioBucketName:
     Description: Name of the S3 bucket for audio uploads and transcripts
@@ -155,3 +338,21 @@ Outputs:
     Value: !Ref TranscriptionLayer
     Export:
       Name: ElderLink-TranscriptionLayerArn
+
+  CareEventsTableName:
+    Description: Name of the DynamoDB table storing validated CareEvents
+    Value: !Ref CareEventsTable
+    Export:
+      Name: ElderLink-CareEventsTableName
+
+  ExtractEventsFunctionName:
+    Description: Name of the ExtractEvents Lambda function
+    Value: !Ref ExtractEventsFunction
+    Export:
+      Name: ElderLink-ExtractEventsFunctionName
+
+  TranscriptCreatedEventBridgeRuleName:
+    Description: Name of the EventBridge rule routing transcript creation to ExtractEvents
+    Value: !Ref TranscriptCreatedEventBridgeRule
+    Export:
+      Name: ElderLink-TranscriptCreatedEventBridgeRuleName
