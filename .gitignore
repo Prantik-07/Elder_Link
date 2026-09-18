@@ -49,6 +49,11 @@ infra/packaged.yaml
 # (single source of truth is backend/core/transcription/)
 backend/layers/transcription/python/
 
+# Generated Lambda layer content - regenerate with
+# infra/build_extraction_layer.sh (single source of truth is
+# backend/core/{care_event,extraction,persistence}/)
+backend/layers/extraction/python/
+
 # Python
 __pycache__/
 *.pyc
