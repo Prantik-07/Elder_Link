@@ -24,19 +24,19 @@ export function CarePage() {
   } = useCareEvents();
 
   return (
-    <div className="mx-auto max-w-[1400px] px-6 py-7 sm:px-8 lg:py-9 xl:px-10">
-      <div className="flex flex-col gap-8 lg:flex-row lg:items-start">
+    <div className="mx-auto max-w-[1400px] px-4 py-5 sm:px-6 sm:py-7 lg:px-8 lg:py-9 xl:px-10">
+      <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:gap-8">
         <div className="min-w-0 flex-1">
           <section className="flex items-start justify-between gap-8">
             <div className="min-w-0 flex-1">
-              <p className="flex items-center gap-1.5 text-[14.5px] font-medium text-[var(--color-ink-muted)]">
+              <p className="flex items-center gap-1.5 text-[13.5px] font-medium text-[var(--color-ink-muted)] sm:text-[14.5px]">
                 <Sun size={15} className="text-[var(--color-amber)]" aria-hidden="true" />
                 {timeOfDayGreeting()}, Shivaansh <span aria-hidden="true">👋</span>
               </p>
-              <h1 className="font-display mt-1.5 max-w-2xl text-[34px] leading-[1.08] font-medium tracking-[-0.01em] text-[var(--color-ink)] sm:text-[42px]">
+              <h1 className="font-display mt-1.5 max-w-2xl text-[26px] leading-[1.12] font-medium tracking-[-0.01em] text-[var(--color-ink)] sm:text-[34px] lg:text-[42px]">
                 What changed since your last handoff?
               </h1>
-              <p className="mt-3 max-w-md text-[15px] leading-relaxed text-[var(--color-ink-soft)]">
+              <p className="mt-2.5 max-w-md text-[14px] leading-relaxed text-[var(--color-ink-soft)] sm:mt-3 sm:text-[15px]">
                 Here&rsquo;s what&rsquo;s new, what matters, and what might need your attention.
               </p>
             </div>
@@ -57,7 +57,7 @@ export function CarePage() {
             </div>
           </section>
 
-          <div className="mt-6">
+          <div className="mt-5 sm:mt-6">
             <FilterBar
               filter={filter}
               onFilterChange={setFilter}
@@ -66,7 +66,7 @@ export function CarePage() {
             />
           </div>
 
-          <div className="mt-6">
+          <div className="mt-5 sm:mt-6">
             {isLoading ? (
               <EmptyState message="Loading care events..." />
             ) : error ? (

@@ -4,7 +4,7 @@ import { CaregiverAvatar } from "../components/CaregiverAvatar";
 
 export function CareCirclePage() {
   return (
-    <div className="mx-auto max-w-5xl px-6 py-7 sm:px-8 lg:py-9 xl:px-10">
+    <div className="mx-auto max-w-5xl px-4 py-5 sm:px-6 sm:py-7 lg:px-8 lg:py-9 xl:px-10">
       <div className="flex flex-col items-start gap-8 lg:flex-row lg:items-center">
         <div className="min-w-0 flex-1">
           <h1 className="font-display text-[28px] text-[var(--color-ink)]">Care Circle</h1>

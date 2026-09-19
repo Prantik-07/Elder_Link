@@ -58,7 +58,7 @@ export function HandoffPage() {
   return (
     <CareDetailLayout>
       <div className="flex flex-col gap-8">
-        <section>
+        <section className="order-1 lg:order-none">
           <h1 className="font-display text-[28px] text-[var(--color-ink)]">Handoff</h1>
           <p className="mt-1.5 max-w-xl text-[14px] leading-relaxed text-[var(--color-ink-soft)]">
             What the next caregiver needs to know since your last handoff, {LAST_HANDOFF_LABEL}.
@@ -88,7 +88,7 @@ export function HandoffPage() {
           </div>
         </section>
 
-        <section>
+        <section className="order-3 lg:order-none">
           <h2 className="mb-2.5 text-[13px] font-semibold tracking-wide text-[var(--color-ink)] uppercase">
             Important changes
           </h2>
@@ -103,7 +103,7 @@ export function HandoffPage() {
           )}
         </section>
 
-        <section>
+        <section className="order-2 lg:order-none">
           <h2
             className="mb-2.5 flex items-center gap-1.5 text-[13px] font-semibold tracking-wide uppercase"
             style={{ color: "var(--color-amber)" }}
@@ -122,7 +122,7 @@ export function HandoffPage() {
           )}
         </section>
 
-        <section>
+        <section className="order-4 lg:order-none">
           <h2 className="mb-2.5 flex items-center gap-1.5 text-[13px] font-semibold tracking-wide text-[var(--color-ink)] uppercase">
             <Calendar size={13} aria-hidden="true" />
             Upcoming items
@@ -141,11 +141,11 @@ export function HandoffPage() {
           </ul>
         </section>
 
-        <div className="border-t pt-6" style={{ borderColor: "var(--color-line)" }}>
+        <div className="order-5 border-t pt-6 lg:order-none" style={{ borderColor: "var(--color-line)" }}>
           <button
             type="button"
             onClick={openReview}
-            className="inline-flex items-center gap-2 rounded-full px-5 py-2.5 text-[14px] font-semibold text-[var(--color-paper)] transition-opacity hover:opacity-90"
+            className="flex w-full items-center justify-center gap-2 rounded-full px-5 py-3.5 text-[14.5px] font-semibold text-[var(--color-paper)] transition-opacity hover:opacity-90 sm:inline-flex sm:w-auto sm:py-2.5 sm:text-[14px]"
             style={{ backgroundColor: "var(--color-teal)" }}
           >
             <ClipboardCheck size={16} aria-hidden="true" />
@@ -182,11 +182,11 @@ export function HandoffPage() {
                   </li>
                 ))}
               </ul>
-              <div className="mt-6 flex gap-2.5">
+              <div className="mt-6 flex flex-col gap-2.5 sm:flex-row">
                 <button
                   type="button"
                   onClick={() => setConfirmed(true)}
-                  className="inline-flex items-center gap-1.5 rounded-full px-5 py-2.5 text-[13.5px] font-semibold text-[var(--color-paper)]"
+                  className="flex w-full items-center justify-center gap-1.5 rounded-full px-5 py-3 text-[13.5px] font-semibold text-[var(--color-paper)] sm:w-auto sm:py-2.5"
                   style={{ backgroundColor: "var(--color-teal)" }}
                 >
                   <Check size={14} aria-hidden="true" />
@@ -195,7 +195,7 @@ export function HandoffPage() {
                 <button
                   type="button"
                   onClick={() => setReviewOpen(false)}
-                  className="rounded-full border px-5 py-2.5 text-[13.5px] font-semibold text-[var(--color-ink-soft)]"
+                  className="w-full rounded-full border px-5 py-3 text-[13.5px] font-semibold text-[var(--color-ink-soft)] sm:w-auto sm:py-2.5"
                   style={{ borderColor: "var(--color-line)" }}
                 >
                   Cancel
@@ -220,7 +220,7 @@ export function HandoffPage() {
               <button
                 type="button"
                 onClick={() => setReviewOpen(false)}
-                className="mt-5 rounded-full px-5 py-2.5 text-[13.5px] font-semibold text-[var(--color-paper)]"
+                className="mt-5 w-full rounded-full px-5 py-3 text-[13.5px] font-semibold text-[var(--color-paper)] sm:w-auto sm:py-2.5"
                 style={{ backgroundColor: "var(--color-teal)" }}
               >
                 Done

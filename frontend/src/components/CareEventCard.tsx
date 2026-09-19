@@ -59,7 +59,7 @@ export function CareEventCard({
           <span className="font-display mt-0.5 block text-[15.5px] leading-snug text-[var(--color-ink)]">
             {event.title}
           </span>
-          <span className="mt-0.5 block truncate text-[13px] text-[var(--color-ink-soft)]">
+          <span className="mt-0.5 block text-[13px] text-[var(--color-ink-soft)] line-clamp-2 lg:line-clamp-1">
             {event.summary}
           </span>
           <span className="mt-1.5 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[12px] text-[var(--color-ink-muted)]">

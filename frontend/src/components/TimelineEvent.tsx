@@ -76,10 +76,10 @@ export function TimelineEvent({
           {event.title}
         </p>
         <div className="mt-1.5 flex items-center justify-between gap-3">
-          <span className="flex items-center gap-1.5 text-[12.5px] text-[var(--color-ink-muted)]">
+          <span className="flex min-w-0 items-center gap-1.5 text-[12.5px] text-[var(--color-ink-muted)]">
             <CaregiverAvatar reportedBy={event.reportedBy} size={16} />
-            {event.reportedBy}
-            {event.evidence && <Mic size={11} aria-label="Has voice evidence" />}
+            <span className="truncate">{event.reportedBy}</span>
+            {event.evidence && <Mic size={11} className="shrink-0" aria-label="Has voice evidence" />}
           </span>
           <StatusBadge status={event.status} size="sm" />
         </div>

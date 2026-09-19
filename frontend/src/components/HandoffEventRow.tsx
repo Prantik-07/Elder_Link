@@ -38,13 +38,17 @@ export function HandoffEventRow({
           <span className="font-display mt-0.5 block text-[14.5px] leading-snug text-[var(--color-ink)]">
             {event.title}
           </span>
-          <span className="mt-1 flex items-center gap-1.5 text-[12px] text-[var(--color-ink-muted)]">
+          <span className="mt-1 flex min-w-0 items-center gap-1.5 text-[12px] text-[var(--color-ink-muted)]">
             <CaregiverAvatar reportedBy={event.reportedBy} size={15} />
-            {event.reportedBy} &middot; {formatTimestamp(event.occurredAt)}
-            {event.evidence && <Mic size={10} aria-label="Has voice evidence" />}
+            <span className="truncate">
+              {event.reportedBy} &middot; {formatTimestamp(event.occurredAt)}
+            </span>
+            {event.evidence && <Mic size={10} className="shrink-0" aria-label="Has voice evidence" />}
           </span>
         </span>
-        <StatusBadge status={event.status} size="sm" />
+        <span className="shrink-0">
+          <StatusBadge status={event.status} size="sm" />
+        </span>
       </button>
     </li>
   );
