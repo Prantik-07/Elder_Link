@@ -1,14 +1,24 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { Check, Mic, Square } from "lucide-react";
+import { AlertTriangle, Check, Clock, Mic, RotateCcw, Square } from "lucide-react";
 import { Modal } from "./Modal";
 import { StatusBadge } from "./StatusBadge";
 import { useCareEvents } from "../state/CareEventsContext";
 import { useReducedMotion } from "../lib/useReducedMotion";
+import {
+  fetchCareEventTimeline,
+  requestAudioUploadUrl,
+  uploadAudioToPresignedUrl,
+  USE_MOCK_DATA,
+} from "../data/api";
 import type { CareEvent } from "../data/types";
 
-type Stage = "idle" | "recording" | "uploading" | "processing" | "done";
+type Stage = "idle" | "recording" | "uploading" | "processing" | "timeout" | "error" | "done";
 
+// --- Mock-data-mode fallback only (VITE_ELDERLINK_USE_MOCK_DATA=true) ---
+// Used purely for local UI work with no backend deployed. The real flow
+// below it (recording -> presigned S3 upload -> poll the real read API)
+// is what runs against the actual deployed ElderLink stack.
 const MOCK_TRANSCRIPT =
   "Just checking in - Dad had his afternoon snack and is resting in the living room now. Seemed calm and comfortable.";
 
@@ -40,6 +50,68 @@ function formatSeconds(s: number): string {
   return `${m}:${sec.toString().padStart(2, "0")}`;
 }
 
+// Candidates in preference order - MediaRecorder.isTypeSupported reports
+// what THIS browser can actually encode, never assumed. Chrome/Firefox
+// report audio/webm; Safari reports audio/mp4; none reliably support wav/
+// mp3 output directly from MediaRecorder.
+const MIME_TYPE_CANDIDATES = [
+  "audio/webm;codecs=opus",
+  "audio/webm",
+  "audio/ogg;codecs=opus",
+  "audio/ogg",
+  "audio/mp4",
+];
+
+function pickSupportedMimeType(): string {
+  if (typeof MediaRecorder === "undefined") return "";
+  for (const candidate of MIME_TYPE_CANDIDATES) {
+    if (MediaRecorder.isTypeSupported?.(candidate)) return candidate;
+  }
+  return ""; // let the browser pick its own default
+}
+
+// The backend's content-type allowlist only recognizes bare MIME types
+// (no codec suffix) - see backend/lambdas/audio_upload_url/handler.py.
+function baseContentType(mimeType: string): string {
+  return mimeType.split(";")[0].trim();
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => window.setTimeout(resolve, ms));
+}
+
+// Bounded polling for the real event this recording produced - the
+// pipeline is asynchronous (S3 -> EventBridge -> process_audio ->
+// EventBridge -> extract_events -> DynamoDB), so there is no "upload
+// finished, event exists" guarantee. Stops as soon as a genuinely new
+// event id appears (never previously seen in this timeline), or gives up
+// after a bounded number of attempts - never spins forever, never
+// fabricates a result.
+const POLL_INTERVAL_MS = 2500;
+const POLL_MAX_ATTEMPTS = 8; // ~20s total - generous relative to the ~3-4s the real pipeline takes end to end
+
+async function pollForNewEvent(
+  preExistingIds: Set<string>,
+  isCancelled: () => boolean,
+): Promise<CareEvent | null> {
+  for (let attempt = 0; attempt < POLL_MAX_ATTEMPTS; attempt++) {
+    await sleep(POLL_INTERVAL_MS);
+    if (isCancelled()) return null;
+    try {
+      const events = await fetchCareEventTimeline();
+      const newEvent = events.find((e) => !preExistingIds.has(e.id));
+      if (newEvent) return newEvent;
+    } catch {
+      // A transient read-API failure mid-poll isn't fatal on its own -
+      // keep trying until POLL_MAX_ATTEMPTS is exhausted, same as a slow
+      // pipeline; only a real, persistent failure surfaces as an error
+      // (the "processing" stage's own timeout path covers that).
+    }
+    if (isCancelled()) return null;
+  }
+  return null;
+}
+
 export function VoiceRecorder({
   renderTrigger,
 }: {
@@ -50,9 +122,26 @@ export function VoiceRecorder({
   const [stage, setStage] = useState<Stage>("idle");
   const [elapsed, setElapsed] = useState(0);
   const [progress, setProgress] = useState(0);
-  const pendingEvent = useRef<CareEvent | null>(null);
-  const { addEvent } = useCareEvents();
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [foundEvent, setFoundEvent] = useState<CareEvent | null>(null);
+  const pendingEvent = useRef<CareEvent | null>(null); // mock-mode path only
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const chunksRef = useRef<BlobPart[]>([]);
+  const preExistingIdsRef = useRef<Set<string>>(new Set());
+  const cancelledRef = useRef(false);
+  const { addEvent, refresh, events } = useCareEvents();
   const reducedMotion = useReducedMotion();
+
+  // Stop any in-flight polling and release the microphone if the recorder
+  // unmounts mid-flow (e.g. the caregiver navigates away) - never leaves a
+  // dangling poll loop or a live mic stream behind.
+  useEffect(() => {
+    return () => {
+      cancelledRef.current = true;
+      streamRef.current?.getTracks().forEach((track) => track.stop());
+    };
+  }, []);
 
   useEffect(() => {
     if (!open) return;
@@ -61,7 +150,9 @@ export function VoiceRecorder({
     return () => window.clearInterval(id);
   }, [open, stage]);
 
+  // --- Mock-data-mode fallback: fake progress + fake extraction result ---
   useEffect(() => {
+    if (!USE_MOCK_DATA) return;
     if (stage !== "uploading") return;
     setProgress(0);
     const id = window.setInterval(() => {
@@ -77,6 +168,7 @@ export function VoiceRecorder({
   }, [stage]);
 
   useEffect(() => {
+    if (!USE_MOCK_DATA) return;
     if (stage === "uploading" && progress >= 100) {
       const t = window.setTimeout(() => setStage("processing"), 250);
       return () => window.clearTimeout(t);
@@ -84,35 +176,138 @@ export function VoiceRecorder({
   }, [stage, progress]);
 
   useEffect(() => {
+    if (!USE_MOCK_DATA) return;
     if (stage !== "processing") return;
     pendingEvent.current = buildMockEvent();
     const t = window.setTimeout(() => setStage("done"), 1600);
     return () => window.clearTimeout(t);
   }, [stage]);
+  // --- end mock-data-mode fallback ---
 
-  const startRecording = () => {
+  const startRecording = async () => {
+    setErrorMessage(null);
     setElapsed(0);
-    setStage("recording");
     setOpen(true);
+
+    if (USE_MOCK_DATA) {
+      setStage("recording");
+      return;
+    }
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      streamRef.current = stream;
+      const mimeType = pickSupportedMimeType();
+      const recorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
+      chunksRef.current = [];
+      recorder.ondataavailable = (e) => {
+        if (e.data.size > 0) chunksRef.current.push(e.data);
+      };
+      mediaRecorderRef.current = recorder;
+      recorder.start();
+      setStage("recording");
+    } catch {
+      setErrorMessage(
+        "Microphone access was denied or unavailable. Please allow microphone access in your browser and try again.",
+      );
+      setStage("error");
+    }
   };
 
-  const stopRecording = () => setStage("uploading");
+  const handleRealUpload = async (blob: Blob, contentType: string) => {
+    setProgress(0);
+    try {
+      const { upload_url: uploadUrl } = await requestAudioUploadUrl(contentType);
+      await uploadAudioToPresignedUrl(uploadUrl, blob, contentType, (fraction) =>
+        setProgress(Math.round(fraction * 100)),
+      );
+    } catch (err) {
+      setErrorMessage(err instanceof Error ? err.message : "Upload failed. Please try again.");
+      setStage("error");
+      return;
+    }
+
+    setStage("processing");
+    cancelledRef.current = false;
+    const result = await pollForNewEvent(preExistingIdsRef.current, () => cancelledRef.current);
+    if (cancelledRef.current) return;
+
+    if (result) {
+      setFoundEvent(result);
+      refresh(); // syncs the shared CareEventsContext so every page reflects it, not just this modal
+      setStage("done");
+    } else {
+      setStage("timeout");
+    }
+  };
+
+  const stopRecording = () => {
+    if (USE_MOCK_DATA) {
+      setStage("uploading");
+      return;
+    }
+
+    const recorder = mediaRecorderRef.current;
+    if (!recorder) return;
+
+    // Snapshot which event ids already exist BEFORE upload starts - this
+    // is how the poller later recognizes "new" without guessing at
+    // timing. Taken from the same CareEventsContext every other page
+    // reads, not a second store.
+    preExistingIdsRef.current = new Set(events.map((e) => e.id));
+
+    recorder.onstop = () => {
+      streamRef.current?.getTracks().forEach((track) => track.stop());
+      const mimeType = recorder.mimeType || "audio/webm";
+      const blob = new Blob(chunksRef.current, { type: mimeType });
+      void handleRealUpload(blob, baseContentType(mimeType));
+    };
+    recorder.stop();
+    setStage("uploading");
+  };
+
+  const checkAgain = async () => {
+    setStage("processing");
+    cancelledRef.current = false;
+    const result = await pollForNewEvent(preExistingIdsRef.current, () => cancelledRef.current);
+    if (cancelledRef.current) return;
+    if (result) {
+      setFoundEvent(result);
+      refresh();
+      setStage("done");
+    } else {
+      setStage("timeout");
+    }
+  };
 
   const close = () => {
+    cancelledRef.current = true;
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
+      mediaRecorderRef.current.stop();
+    }
+    streamRef.current?.getTracks().forEach((track) => track.stop());
     setOpen(false);
     window.setTimeout(() => {
       setStage("idle");
       setElapsed(0);
       setProgress(0);
+      setErrorMessage(null);
+      setFoundEvent(null);
+      pendingEvent.current = null;
     }, 200);
   };
 
   const viewInStream = () => {
-    if (pendingEvent.current) addEvent(pendingEvent.current);
+    if (USE_MOCK_DATA && pendingEvent.current) {
+      addEvent(pendingEvent.current);
+    }
+    // Real mode: the event already came from the real API via refresh() -
+    // nothing to add, just close and let the caregiver find it in the list.
     close();
   };
 
   const transition = reducedMotion ? { duration: 0 } : { duration: 0.18 };
+  const displayEvent = USE_MOCK_DATA ? pendingEvent.current : foundEvent;
 
   return (
     <>
@@ -167,7 +362,7 @@ export function VoiceRecorder({
                 <button
                   type="button"
                   onClick={stopRecording}
-                  className="mt-6 inline-flex items-center gap-2 rounded-full px-5 py-2.5 text-[13.5px] font-semibold text-[var(--color-paper)]"
+                  className="mt-6 inline-flex items-center gap-2 rounded-full px-5 py-3 text-[14px] font-semibold text-[var(--color-paper)] sm:py-2.5 sm:text-[13.5px]"
                   style={{ backgroundColor: "var(--color-teal)" }}
                 >
                   <Square size={13} fill="currentColor" aria-hidden="true" />
@@ -217,7 +412,7 @@ export function VoiceRecorder({
                 className="flex flex-col items-center py-8 text-center"
               >
                 <h2 id="voice-recorder-title" className="font-display text-[19px] text-[var(--color-ink)]">
-                  Transcribing...
+                  Processing note
                 </h2>
                 <span
                   className={`mt-6 h-9 w-9 rounded-full border-2 border-[var(--color-line)] border-t-[var(--color-teal)] ${
@@ -226,12 +421,103 @@ export function VoiceRecorder({
                   aria-hidden="true"
                 />
                 <p className="mt-5 text-[13px] text-[var(--color-ink-muted)]">
-                  Turning your voice note into a care event.
+                  {USE_MOCK_DATA
+                    ? "Turning your voice note into a care event."
+                    : "Transcribing and extracting a care event - this usually takes a few seconds."}
                 </p>
               </motion.div>
             )}
 
-            {stage === "done" && pendingEvent.current && (
+            {stage === "timeout" && (
+              <motion.div
+                key="timeout"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={transition}
+                className="flex flex-col items-center py-6 text-center"
+              >
+                <span
+                  className="flex h-11 w-11 items-center justify-center rounded-full"
+                  style={{ backgroundColor: "var(--color-amber-soft)", color: "var(--color-amber)" }}
+                  aria-hidden="true"
+                >
+                  <Clock size={20} />
+                </span>
+                <h2 id="voice-recorder-title" className="font-display mt-3 text-[19px] text-[var(--color-ink)]">
+                  Still processing
+                </h2>
+                <p className="mt-1.5 max-w-xs text-[13px] leading-relaxed text-[var(--color-ink-muted)]">
+                  Your recording uploaded successfully, but it's taking longer than usual to appear. It will
+                  show up automatically once ready - you can check again now or come back later.
+                </p>
+                <div className="mt-5 flex w-full flex-col gap-2 sm:flex-row sm:justify-center">
+                  <button
+                    type="button"
+                    onClick={checkAgain}
+                    className="inline-flex items-center justify-center gap-1.5 rounded-full px-5 py-3 text-[14px] font-semibold text-[var(--color-paper)] sm:py-2.5 sm:text-[13.5px]"
+                    style={{ backgroundColor: "var(--color-teal)" }}
+                  >
+                    <RotateCcw size={14} aria-hidden="true" />
+                    Check again
+                  </button>
+                  <button
+                    type="button"
+                    onClick={close}
+                    className="rounded-full border px-5 py-3 text-[14px] font-semibold text-[var(--color-ink-soft)] sm:py-2.5 sm:text-[13.5px]"
+                    style={{ borderColor: "var(--color-line)" }}
+                  >
+                    Close
+                  </button>
+                </div>
+              </motion.div>
+            )}
+
+            {stage === "error" && (
+              <motion.div
+                key="error"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={transition}
+                className="flex flex-col items-center py-6 text-center"
+              >
+                <span
+                  className="flex h-11 w-11 items-center justify-center rounded-full"
+                  style={{ backgroundColor: "var(--color-concern-soft)", color: "var(--color-concern)" }}
+                  aria-hidden="true"
+                >
+                  <AlertTriangle size={20} />
+                </span>
+                <h2 id="voice-recorder-title" className="font-display mt-3 text-[19px] text-[var(--color-ink)]">
+                  Something went wrong
+                </h2>
+                <p className="mt-1.5 max-w-xs text-[13px] leading-relaxed text-[var(--color-ink-muted)]">
+                  {errorMessage ?? "We couldn't record or send that voice note."}
+                </p>
+                <div className="mt-5 flex w-full flex-col gap-2 sm:flex-row sm:justify-center">
+                  <button
+                    type="button"
+                    onClick={startRecording}
+                    className="inline-flex items-center justify-center gap-1.5 rounded-full px-5 py-3 text-[14px] font-semibold text-[var(--color-paper)] sm:py-2.5 sm:text-[13.5px]"
+                    style={{ backgroundColor: "var(--color-teal)" }}
+                  >
+                    <Mic size={14} aria-hidden="true" />
+                    Try again
+                  </button>
+                  <button
+                    type="button"
+                    onClick={close}
+                    className="rounded-full border px-5 py-3 text-[14px] font-semibold text-[var(--color-ink-soft)] sm:py-2.5 sm:text-[13.5px]"
+                    style={{ borderColor: "var(--color-line)" }}
+                  >
+                    Close
+                  </button>
+                </div>
+              </motion.div>
+            )}
+
+            {stage === "done" && displayEvent && (
               <motion.div
                 key="done"
                 initial={{ opacity: 0 }}
@@ -248,27 +534,25 @@ export function VoiceRecorder({
                     <Check size={16} strokeWidth={2.5} />
                   </span>
                   <h2 id="voice-recorder-title" className="font-display text-[19px] text-[var(--color-ink)]">
-                    Care event created
+                    Update added
                   </h2>
                 </div>
                 <div
                   className="mt-4 rounded-xl border p-3.5"
                   style={{ borderColor: "var(--color-line)", backgroundColor: "var(--color-ivory-soft)" }}
                 >
-                  <p className="font-display text-[15px] text-[var(--color-ink)]">
-                    {pendingEvent.current.title}
-                  </p>
+                  <p className="font-display text-[15px] text-[var(--color-ink)]">{displayEvent.title}</p>
                   <p className="mt-1 text-[13px] text-[var(--color-ink-muted)]">
-                    {pendingEvent.current.reportedBy} &middot; Just now
+                    {displayEvent.reportedBy} &middot; Just now
                   </p>
                   <div className="mt-2.5">
-                    <StatusBadge status={pendingEvent.current.status} size="sm" />
+                    <StatusBadge status={displayEvent.status} size="sm" />
                   </div>
                 </div>
                 <button
                   type="button"
                   onClick={viewInStream}
-                  className="mt-5 w-full rounded-full px-5 py-2.5 text-[13.5px] font-semibold text-[var(--color-paper)]"
+                  className="mt-5 w-full rounded-full px-5 py-3 text-[14px] font-semibold text-[var(--color-paper)] sm:py-2.5 sm:text-[13.5px]"
                   style={{ backgroundColor: "var(--color-teal)" }}
                 >
                   View in Care stream
