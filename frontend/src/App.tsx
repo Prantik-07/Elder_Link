@@ -1,5 +1,6 @@
 import { Route, Routes } from "react-router-dom";
 import { Header } from "./components/Header";
+import { BottomNav } from "./components/BottomNav";
 import { CarePage } from "./pages/CarePage";
 import { TimelinePage } from "./pages/TimelinePage";
 import { HandoffPage } from "./pages/HandoffPage";
@@ -17,7 +18,9 @@ export default function App() {
           Skip to content
         </a>
         <Header />
-        <main id="main-content">
+        {/* Bottom nav is fixed and phone/tablet-only (lg:hidden) - this
+            padding keeps it from covering the last card of any page. */}
+        <main id="main-content" className="pb-[calc(4.5rem+env(safe-area-inset-bottom))] lg:pb-0">
           <Routes>
             <Route path="/" element={<CarePage />} />
             <Route path="/timeline" element={<TimelinePage />} />
@@ -25,6 +28,7 @@ export default function App() {
             <Route path="/care-circle" element={<CareCirclePage />} />
           </Routes>
         </main>
+        <BottomNav />
       </div>
     </CareEventsProvider>
   );
