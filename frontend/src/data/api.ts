@@ -35,3 +35,78 @@ export async function fetchCareEventTimeline(
   const data: TimelineResponse = await response.json();
   return data.events;
 }
+
+export interface AudioUploadUrlResponse {
+  object_key: string;
+  upload_url: string;
+  method: "PUT";
+  headers: Record<string, string>;
+  care_recipient_id: string;
+  expires_in: number;
+}
+
+/**
+ * Day 4: asks the backend (POST /audio/upload-url) for a presigned S3 PUT
+ * URL under the existing audio/ prefix - the browser never holds an AWS
+ * credential. Throws on any non-2xx response or network failure, same
+ * honesty rule as fetchCareEventTimeline: a failure here must surface as a
+ * real error state in the recorder, never a silently-skipped step.
+ */
+export async function requestAudioUploadUrl(
+  contentType: string,
+  careRecipientId: string = CARE_RECIPIENT_ID,
+): Promise<AudioUploadUrlResponse> {
+  if (!API_BASE_URL) {
+    throw new Error("VITE_ELDERLINK_API_URL is not configured - cannot request an upload URL.");
+  }
+
+  const response = await fetch(`${API_BASE_URL.replace(/\/$/, "")}/audio/upload-url`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ care_recipient_id: careRecipientId, content_type: contentType }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to get an upload URL: ${response.status} ${response.statusText}`);
+  }
+
+  return response.json();
+}
+
+/**
+ * Uploads a recorded audio Blob directly to S3 via a presigned PUT URL.
+ * Uses XMLHttpRequest (not fetch) specifically so real upload progress is
+ * available - onProgress reports true bytes-sent/bytes-total, never a
+ * fabricated percentage.
+ */
+export function uploadAudioToPresignedUrl(
+  uploadUrl: string,
+  blob: Blob,
+  contentType: string,
+  onProgress?: (fraction: number) => void,
+): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("PUT", uploadUrl);
+    xhr.setRequestHeader("Content-Type", contentType);
+
+    xhr.upload.onprogress = (event) => {
+      if (event.lengthComputable && onProgress) {
+        onProgress(event.loaded / event.total);
+      }
+    };
+
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        resolve();
+      } else {
+        reject(new Error(`Upload to S3 failed: ${xhr.status} ${xhr.statusText}`));
+      }
+    };
+
+    xhr.onerror = () => reject(new Error("Upload to S3 failed - network error."));
+    xhr.onabort = () => reject(new Error("Upload cancelled."));
+
+    xhr.send(blob);
+  });
+}

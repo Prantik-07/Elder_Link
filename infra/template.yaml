@@ -42,6 +42,22 @@ Resources:
       NotificationConfiguration:
         EventBridgeConfiguration:
           EventBridgeEnabled: true
+      # Day 4: lets the browser PUT a recorded voice note directly to a
+      # presigned URL under audio/ (see AudioUploadUrlFunction) without
+      # proxying the binary through Lambda/API Gateway. Presigning alone
+      # authorizes the request; this CORS rule is what lets the BROWSER
+      # itself make the cross-origin PUT at all - it does not, by itself,
+      # grant any additional access beyond what the presigned URL already
+      # allows for that one object.
+      CorsConfiguration:
+        CorsRules:
+          - AllowedOrigins:
+              - http://localhost:5173
+            AllowedMethods:
+              - PUT
+            AllowedHeaders:
+              - Content-Type
+            MaxAge: 3000
 
   ProcessAudioFunction:
     Type: AWS::Serverless::Function
@@ -377,10 +393,68 @@ Resources:
                   - !GetAtt CareEventsTable.Arn
                   - !Sub ${CareEventsTable.Arn}/index/CareTimelineIndex
 
+  # Day 4: the ingestion bridge - signs a presigned S3 PutObject URL under
+  # audio/ so the browser's VoiceRecorder can upload a real recording
+  # directly to S3. This Lambda never touches audio bytes, transcription,
+  # or extraction - once the object lands in S3, the existing, unchanged
+  # EventBridge -> process_audio -> ... -> DynamoDB pipeline takes over.
+  # See backend/lambdas/audio_upload_url/handler.py for the full security
+  # posture (no AWS credentials ever reach the browser; object keys are
+  # always server-generated under audio/, never client-supplied).
+  AudioUploadUrlFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: elderlink-audio-upload-url
+      CodeUri: ../backend/lambdas/audio_upload_url/
+      Handler: handler.lambda_handler
+      Role: !GetAtt AudioUploadUrlRole.Arn
+      # No layers - this function only calls boto3's S3 presigning, which
+      # needs none of the care_event/extraction/persistence/transcription
+      # modules the other Lambdas' layers provide.
+      Environment:
+        Variables:
+          AUDIO_BUCKET_NAME: !Ref AudioBucket
+          ELDERLINK_AWS_REGION: us-east-1
+          DEFAULT_CARE_RECIPIENT_ID: demo-dad
+          ELDERLINK_CORS_ORIGIN: http://localhost:5173
+      Events:
+        AudioUploadUrl:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref CareEventsHttpApi
+            Path: /audio/upload-url
+            Method: POST
+
+  AudioUploadUrlRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: ElderLinkAudioUploadUrlS3Access
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              # PutObject only, scoped to audio/* only - this role can sign
+              # a URL that lets a browser write ONE object under audio/; it
+              # cannot read, list, or delete anything in the bucket. No
+              # s3:* wildcards.
+              - Effect: Allow
+                Action:
+                  - s3:PutObject
+                Resource: !Sub ${AudioBucket.Arn}/audio/*
+
   # CORS is also configured at the HTTP API level (in addition to the
-  # headers GetTimelineFunction itself returns) so OPTIONS preflight
-  # requests are answered by API Gateway directly, without invoking the
-  # Lambda at all.
+  # headers GetTimelineFunction/AudioUploadUrlFunction themselves return)
+  # so OPTIONS preflight requests are answered by API Gateway directly,
+  # without invoking either Lambda at all.
   CareEventsHttpApi:
     Type: AWS::Serverless::HttpApi
     Properties:
@@ -390,6 +464,7 @@ Resources:
           - http://localhost:5173
         AllowMethods:
           - GET
+          - POST
           - OPTIONS
         AllowHeaders:
           - Content-Type
@@ -448,3 +523,9 @@ Outputs:
     Value: !Sub https://${CareEventsHttpApi}.execute-api.${AWS::Region}.amazonaws.com
     Export:
       Name: ElderLink-CareEventsApiUrl
+
+  AudioUploadUrlFunctionName:
+    Description: Name of the Day 4 presigned-upload-URL Lambda function
+    Value: !Ref AudioUploadUrlFunction
+    Export:
+      Name: ElderLink-AudioUploadUrlFunctionName
