@@ -132,13 +132,13 @@ export function EvidencePanel({
       </div>
 
       <div
-        className="flex flex-wrap items-center gap-2.5 border-t px-6 py-[1.125rem]"
-        style={{ borderColor: "var(--color-line)" }}
+        className="flex flex-col gap-2 border-t px-6 py-[1.125rem] sm:flex-row sm:flex-wrap sm:items-center sm:gap-2.5"
+        style={{ borderColor: "var(--color-line)", paddingBottom: "max(1.125rem, env(safe-area-inset-bottom))" }}
       >
         <button
           type="button"
           onClick={() => onSetStatus("verified")}
-          className="inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-[13px] font-semibold text-[var(--color-paper)] transition-opacity hover:opacity-90"
+          className="flex w-full items-center justify-center gap-1.5 rounded-full px-4 py-3 text-[14px] font-semibold text-[var(--color-paper)] transition-opacity hover:opacity-90 sm:w-auto sm:py-2 sm:text-[13px]"
           style={{ backgroundColor: "var(--color-teal)" }}
         >
           <Check size={14} aria-hidden="true" />
@@ -147,14 +147,14 @@ export function EvidencePanel({
         <button
           type="button"
           onClick={() => onSetStatus("uncertain")}
-          className="rounded-full border px-4 py-2 text-[13px] font-semibold text-[var(--color-ink-soft)] transition-colors hover:text-[var(--color-ink)]"
+          className="w-full rounded-full border px-4 py-3 text-[14px] font-semibold text-[var(--color-ink-soft)] transition-colors hover:text-[var(--color-ink)] sm:w-auto sm:py-2 sm:text-[13px]"
           style={{ borderColor: "var(--color-line)" }}
         >
           Keep Uncertain
         </button>
         <button
           type="button"
-          className="inline-flex items-center gap-1.5 rounded-full border px-4 py-2 text-[13px] font-semibold text-[var(--color-ink-soft)] transition-colors hover:text-[var(--color-ink)]"
+          className="flex w-full items-center justify-center gap-1.5 rounded-full border px-4 py-3 text-[14px] font-semibold text-[var(--color-ink-soft)] transition-colors hover:text-[var(--color-ink)] sm:w-auto sm:py-2 sm:text-[13px]"
           style={{ borderColor: "var(--color-line)" }}
         >
           <StickyNote size={14} aria-hidden="true" />

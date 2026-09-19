@@ -74,7 +74,7 @@ export function AudioEvidencePlayer({
         type="button"
         onClick={togglePlay}
         aria-label={playing ? "Pause evidence audio" : "Play evidence audio"}
-        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[var(--color-paper)] transition-transform active:scale-95"
+        className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-[var(--color-paper)] transition-transform active:scale-95 lg:h-9 lg:w-9"
         style={{ backgroundColor: "var(--color-teal)" }}
       >
         {playing ? (
@@ -95,7 +95,7 @@ export function AudioEvidencePlayer({
         aria-valuemin={0}
         aria-valuemax={durationSeconds}
         aria-valuenow={Math.round(elapsed)}
-        className="relative flex h-8 flex-1 items-center gap-[2px] overflow-hidden rounded"
+        className="relative flex h-10 flex-1 items-center gap-[2px] overflow-hidden rounded lg:h-8"
       >
         {bars.map((h, i) => {
           const played = i / bars.length <= progress;
@@ -121,7 +121,7 @@ export function AudioEvidencePlayer({
       <button
         type="button"
         onClick={cycleSpeed}
-        className="shrink-0 rounded-full border px-2 py-1 text-[11px] font-semibold tabular-nums text-[var(--color-ink-soft)]"
+        className="shrink-0 rounded-full border px-2.5 py-2 text-[11px] font-semibold tabular-nums text-[var(--color-ink-soft)] lg:py-1"
         style={{ borderColor: "var(--color-line)" }}
         aria-label="Playback speed"
       >

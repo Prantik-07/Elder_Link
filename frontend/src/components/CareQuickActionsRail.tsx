@@ -31,10 +31,10 @@ function VoiceNoteCard() {
           <button
             type="button"
             onClick={onClick}
-            className="mt-3.5 inline-flex w-full items-center justify-center gap-2 rounded-full py-2.5 text-[13.5px] font-semibold text-[var(--color-paper)] transition-opacity hover:opacity-90"
+            className="mt-3.5 inline-flex w-full items-center justify-center gap-2 rounded-full py-3.5 text-[14.5px] font-semibold text-[var(--color-paper)] transition-opacity hover:opacity-90 lg:py-2.5 lg:text-[13.5px]"
             style={{ backgroundColor: "var(--color-teal)" }}
           >
-            <Mic size={14} aria-hidden="true" />
+            <Mic size={15} aria-hidden="true" />
             Tap to speak
           </button>
         </div>
