@@ -8,10 +8,17 @@ import boto3
 from botocore.exceptions import BotoCoreError, ClientError
 
 
-# Must stay in sync with VoxtralProvider.SUPPORTED_FORMATS - accepting an
-# extension here that the configured provider can't handle just delays the
-# failure instead of preventing it.
-SUPPORTED_AUDIO_EXTENSIONS = {".wav", ".mp3", ".flac", ".ogg", ".m4a"}
+# Must stay in sync with VoxtralProvider.SUPPORTED_FORMATS, EXCEPT for
+# ".webm" - added for Day 4 (real browser voice ingestion): Chrome/Firefox's
+# MediaRecorder defaults to audio/webm and there is no in-browser way to
+# force wav/mp3 output without extra encoding libraries. VoxtralProvider
+# does NOT support webm; a real (non-mock) transcription attempt on a
+# browser-recorded upload will fail explicitly with "Unsupported audio
+# format: webm" (see voxtral.py) rather than silently mistranscribing -
+# that is a documented, accepted gap for this phase, not something worked
+# around with a transcoding service. MockTranscriptionProvider ignores
+# audio format entirely, so the mock E2E path is unaffected either way.
+SUPPORTED_AUDIO_EXTENSIONS = {".wav", ".mp3", ".flac", ".ogg", ".m4a", ".webm"}
 MAX_AUDIO_SIZE = int(os.getenv("MAX_AUDIO_SIZE_BYTES", "10485760"))
 TRANSCRIPTION_PROVIDER = os.getenv("TRANSCRIPTION_PROVIDER", "mock")
 AWS_REGION = os.getenv("ELDERLINK_AWS_REGION", "us-east-1")

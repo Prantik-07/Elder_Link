@@ -79,6 +79,13 @@ class TestIsValidAudioObject:
     def test_valid_m4a_in_audio_prefix(self):
         assert is_valid_audio_object("audio/note.m4a") is True
 
+    def test_valid_webm_in_audio_prefix(self):
+        # Day 4: Chrome/Firefox's MediaRecorder default output format for
+        # real browser voice ingestion - see the module docstring on
+        # SUPPORTED_AUDIO_EXTENSIONS for why this isn't in
+        # VoxtralProvider.SUPPORTED_FORMATS too.
+        assert is_valid_audio_object("audio/note.webm") is True
+
     def test_aiff_rejected_not_supported_by_provider(self):
         # aiff is not part of the Bedrock Converse AudioFormat enum, so it
         # must not be accepted here even though older code once allowed it.
