@@ -28,7 +28,7 @@ export function TimelinePage() {
     sortOrder,
     toggleSortOrder,
     selectedId,
-    selectEvent,
+    toggleEvent,
   } = useCareEvents();
 
   const groups = useMemo(() => groupByDay(visibleEvents), [visibleEvents]);
@@ -70,7 +70,7 @@ export function TimelinePage() {
                       event={event}
                       selected={event.id === selectedId}
                       isLast={i === group.items.length - 1}
-                      onSelect={() => selectEvent(event.id)}
+                      onSelect={() => toggleEvent(event.id)}
                     />
                   ))}
                 </ul>

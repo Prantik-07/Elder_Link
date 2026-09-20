@@ -1,48 +1,44 @@
-import { useEffect } from "react";
-import { createPortal } from "react-dom";
+import { AnimatePresence, motion } from "framer-motion";
 import { useCareEvents } from "../state/CareEventsContext";
-import { EvidencePanel } from "./EvidencePanel";
+import {
+  MobileEventSheet,
+  SelectedEvidence,
+  useEscapeToClose,
+  useSlideMotion,
+} from "./EventDetailPanel";
 
 /**
- * Full evidence/verification view for the selected event, shown as an
- * overlay on top of the Care homepage (rather than a persistent side
- * column) so the homepage's right rail can stay dedicated to quick
- * actions and personalization, matching the approved reference layout.
+ * Evidence/verification view for the selected event on the Care homepage.
+ * On desktop it slides in over the right rail from the edge of the page
+ * container (clipped there, not the viewport; overflow-clip keeps the sticky panel working); below lg it's a full-screen sheet.
+ * Render inside a `relative` page container.
  */
 export function EventDetailDrawer() {
-  const { selectedEvent, selectEvent, setStatus } = useCareEvents();
+  const { selectedId } = useCareEvents();
+  const motionProps = useSlideMotion();
+  useEscapeToClose();
 
-  useEffect(() => {
-    if (!selectedEvent) return;
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") selectEvent(null);
-    };
-    document.addEventListener("keydown", onKeyDown);
-    return () => document.removeEventListener("keydown", onKeyDown);
-  }, [selectedEvent, selectEvent]);
-
-  if (!selectedEvent) return null;
-
-  return createPortal(
-    <div className="fixed inset-0 z-40">
+  return (
+    <>
       <div
-        className="absolute inset-0 bg-[var(--color-ink)]/35 backdrop-blur-[1px]"
-        onClick={() => selectEvent(null)}
-        aria-hidden="true"
-      />
-      <div
-        className="absolute inset-y-0 right-0 flex w-full max-w-full flex-col bg-[var(--color-paper)] shadow-[var(--shadow-panel)] sm:max-w-[26rem]"
-        role="dialog"
-        aria-modal="true"
+        className="pointer-events-none absolute inset-y-0 right-0 z-20 hidden w-[26rem] overflow-clip lg:block"
         aria-label="Event detail"
       >
-        <EvidencePanel
-          event={selectedEvent}
-          onClose={() => selectEvent(null)}
-          onSetStatus={(status) => setStatus(selectedEvent.id, status)}
-        />
+        <AnimatePresence>
+          {selectedId && (
+            <motion.div
+              className="pointer-events-auto sticky top-16 h-[calc(100vh-4rem)] border-l bg-[var(--color-paper)] shadow-[var(--shadow-panel)]"
+              style={{ borderColor: "var(--color-line)" }}
+              role="dialog"
+              aria-label="Event detail"
+              {...motionProps}
+            >
+              <SelectedEvidence />
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
-    </div>,
-    document.body,
+      <MobileEventSheet />
+    </>
   );
 }

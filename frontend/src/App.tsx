@@ -1,15 +1,27 @@
-import { Route, Routes } from "react-router-dom";
+import { useEffect } from "react";
+import { Route, Routes, useLocation } from "react-router-dom";
 import { Header } from "./components/Header";
 import { BottomNav } from "./components/BottomNav";
 import { CarePage } from "./pages/CarePage";
 import { TimelinePage } from "./pages/TimelinePage";
 import { HandoffPage } from "./pages/HandoffPage";
 import { CareCirclePage } from "./pages/CareCirclePage";
-import { CareEventsProvider } from "./state/CareEventsContext";
+import { CareEventsProvider, useCareEvents } from "./state/CareEventsContext";
+
+/** Selection is shared state, so drop it on navigation instead of opening the panel on the next page. */
+function ClearSelectionOnNavigate() {
+  const { pathname } = useLocation();
+  const { selectEvent } = useCareEvents();
+  useEffect(() => {
+    selectEvent(null);
+  }, [pathname, selectEvent]);
+  return null;
+}
 
 export default function App() {
   return (
     <CareEventsProvider>
+      <ClearSelectionOnNavigate />
       <div className="min-h-screen bg-[var(--color-ivory)]">
         <a
           href="#main-content"

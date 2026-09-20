@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import clsx from "clsx";
 import { useNavigate } from "react-router-dom";
 import { Bell, Heart, Mic, Upload, Users } from "lucide-react";
 import { useCareEvents } from "../state/CareEventsContext";
@@ -118,9 +119,8 @@ function TeamEffortCard() {
 
 function ReminderCard() {
   return (
-    <button
-      type="button"
-      className="flex w-full items-center gap-3 rounded-2xl border p-4 text-left transition-colors hover:bg-[var(--color-paper)]"
+    <div
+      className="flex w-full items-center gap-3 rounded-2xl border p-4 text-left"
       style={{ borderColor: "var(--color-routine-soft)", backgroundColor: "var(--color-routine-soft)" }}
     >
       <span
@@ -131,16 +131,19 @@ function ReminderCard() {
         <Bell size={15} strokeWidth={2} />
       </span>
       <span className="min-w-0 flex-1">
-        <span className="block text-[11.5px] font-medium text-[var(--color-ink-muted)]">Today&rsquo;s reminder</span>
+        <span className="block text-[12px] font-medium text-[var(--color-ink-muted)]">Today&rsquo;s reminder</span>
         <span className="block text-[13.5px] font-medium text-[var(--color-ink)]">9:00 AM &middot; Check blood pressure</span>
       </span>
-    </button>
+    </div>
   );
 }
 
-export function CareQuickActionsRail() {
+export function CareQuickActionsRail({ className }: { className?: string }) {
   return (
-    <aside className="flex w-full flex-col gap-3.5 lg:w-80 lg:shrink-0" aria-label="Quick actions">
+    <aside
+      className={clsx("flex w-full flex-col gap-3.5 lg:w-80 lg:shrink-0", className)}
+      aria-label="Quick actions"
+    >
       <VoiceNoteCard />
       <NextHandoffCard />
       <TeamEffortCard />

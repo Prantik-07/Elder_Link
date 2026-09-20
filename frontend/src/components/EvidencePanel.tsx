@@ -1,8 +1,9 @@
 import { useState } from "react";
-import { Calendar, CircleHelp, Check, Loader2, MapPin, User, X } from "lucide-react";
+import { Calendar, Check, CircleHelp, Loader2, MapPin, StickyNote, Trash2, User, X } from "lucide-react";
 import type { CareEvent, CareEventStatus } from "../data/types";
 import { CATEGORY_META } from "../lib/categoryMeta";
 import { formatTimestamp } from "../lib/format";
+import { addNote, removeNote, useNotes } from "../lib/notes";
 import { StatusBadge } from "./StatusBadge";
 import { AudioEvidencePlayer } from "./AudioEvidencePlayer";
 
@@ -26,6 +27,17 @@ export function EvidencePanel({
   const Icon = meta.icon;
   const label = event.categoryLabel ?? meta.label;
   const reason = event.verificationReason ?? REASON_COPY[event.status];
+  const notes = useNotes(event.id);
+  const [noteOpen, setNoteOpen] = useState(false);
+  const [draft, setDraft] = useState("");
+
+  const saveNote = () => {
+    const text = draft.trim();
+    if (!text) return;
+    addNote(event.id, text);
+    setDraft("");
+    setNoteOpen(false);
+  };
 
   const [pendingStatus, setPendingStatus] = useState<CareEventStatus | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -50,11 +62,11 @@ export function EvidencePanel({
     <div className="flex h-full flex-col">
       <div className="flex items-start justify-between gap-3 border-b px-6 py-[1.125rem]" style={{ borderColor: "var(--color-line)" }}>
         <span
-          className="inline-flex items-center gap-2 text-[11px] font-semibold tracking-wide uppercase"
+          className="inline-flex items-center gap-2 text-[12px] font-semibold tracking-wide uppercase"
           style={{ color: meta.iconColor }}
         >
           <span
-            className="flex h-7 w-7 items-center justify-center rounded-full"
+            className="flex h-7 w-7 items-center justify-center rounded-lg"
             style={{ backgroundColor: meta.iconBg }}
             aria-hidden="true"
           >
@@ -118,7 +130,7 @@ export function EvidencePanel({
                 durationSeconds={event.evidence.durationSeconds ?? 15}
               />
               <div>
-                <span className="text-[11px] font-semibold tracking-wide text-[var(--color-ink-muted)] uppercase">
+                <span className="text-[12px] font-semibold tracking-wide text-[var(--color-ink-muted)] uppercase">
                   Transcript excerpt
                 </span>
                 <blockquote
@@ -134,7 +146,7 @@ export function EvidencePanel({
 
         <section className="mt-7 grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div className="rounded-xl border p-3.5" style={{ borderColor: "var(--color-line)" }}>
-            <span className="text-[11px] font-semibold tracking-wide text-[var(--color-ink-muted)] uppercase">
+            <span className="text-[12px] font-semibold tracking-wide text-[var(--color-ink-muted)] uppercase">
               Verification status
             </span>
             <div className="mt-2">
@@ -142,13 +154,73 @@ export function EvidencePanel({
             </div>
           </div>
           <div className="rounded-xl border p-3.5" style={{ borderColor: "var(--color-line)" }}>
-            <span className="flex items-center gap-1.5 text-[11px] font-semibold tracking-wide text-[var(--color-ink-muted)] uppercase">
+            <span className="flex items-center gap-1.5 text-[12px] font-semibold tracking-wide text-[var(--color-ink-muted)] uppercase">
               <CircleHelp size={12} aria-hidden="true" />
               Why verification is required
             </span>
             <p className="mt-1.5 text-[13px] leading-snug text-[var(--color-ink-soft)]">{reason}</p>
           </div>
         </section>
+
+        {(notes.length > 0 || noteOpen) && (
+          <section className="mt-7">
+            <h3 className="text-[13px] font-semibold text-[var(--color-ink)]">Notes</h3>
+            <ul className="mt-2 space-y-2">
+              {notes.map((n) => (
+                <li
+                  key={n.id}
+                  className="flex items-start gap-2 rounded-lg border px-3 py-2 text-[13.5px] leading-snug text-[var(--color-ink-soft)]"
+                  style={{ borderColor: "var(--color-line)", backgroundColor: "var(--color-ivory-soft)" }}
+                >
+                  <span className="min-w-0 flex-1 break-words whitespace-pre-wrap">{n.text}</span>
+                  <button
+                    type="button"
+                    onClick={() => removeNote(event.id, n.id)}
+                    aria-label="Delete note"
+                    className="-my-1 -mr-1.5 shrink-0 rounded-full p-2 text-[var(--color-ink-muted)] transition-colors hover:text-[var(--color-concern)]"
+                  >
+                    <Trash2 size={14} aria-hidden="true" />
+                  </button>
+                </li>
+              ))}
+            </ul>
+            {noteOpen && (
+              <div className="mt-2.5">
+                <textarea
+                  value={draft}
+                  onChange={(e) => setDraft(e.target.value)}
+                  autoFocus
+                  rows={3}
+                  aria-label="Note"
+                  placeholder="Add a note for the next caregiver..."
+                  className="w-full rounded-lg border bg-[var(--color-paper)] px-3 py-2 text-[14px]"
+                  style={{ borderColor: "var(--color-line)" }}
+                />
+                <div className="mt-2 flex gap-2">
+                  <button
+                    type="button"
+                    onClick={saveNote}
+                    className="rounded-full px-4 py-2 text-[13px] font-semibold text-[var(--color-paper)]"
+                    style={{ backgroundColor: "var(--color-teal)" }}
+                  >
+                    Save note
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setNoteOpen(false);
+                      setDraft("");
+                    }}
+                    className="rounded-full border px-4 py-2 text-[13px] font-semibold text-[var(--color-ink-soft)]"
+                    style={{ borderColor: "var(--color-line)" }}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
+          </section>
+        )}
       </div>
 
       <div
@@ -184,6 +256,15 @@ export function EvidencePanel({
             {saveError}
           </p>
         )}
+        <button
+          type="button"
+          onClick={() => setNoteOpen(true)}
+          className="flex w-full items-center justify-center gap-1.5 rounded-full border px-4 py-3 text-[14px] font-semibold text-[var(--color-ink-soft)] transition-colors hover:text-[var(--color-ink)] sm:w-auto sm:py-2 sm:text-[13px]"
+          style={{ borderColor: "var(--color-line)" }}
+        >
+          <StickyNote size={14} aria-hidden="true" />
+          Add Note
+        </button>
       </div>
     </div>
   );

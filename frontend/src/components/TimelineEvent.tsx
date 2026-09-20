@@ -59,12 +59,12 @@ export function TimelineEvent({
         )}
         style={
           selected
-            ? { backgroundColor: "var(--color-paper)", borderColor: "var(--color-line)" }
+            ? { backgroundColor: "var(--color-paper)", borderColor: "var(--color-teal)" }
             : undefined
         }
       >
         <div className="flex items-center justify-between gap-3">
-          <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold tracking-wide uppercase" style={{ color: meta.iconColor }}>
+          <span className="inline-flex items-center gap-1.5 text-[12px] font-semibold tracking-wide uppercase" style={{ color: meta.iconColor }}>
             <Icon size={12} aria-hidden="true" />
             {label}
           </span>

@@ -27,7 +27,7 @@ export function BottomNav() {
             to={item.to}
             end={item.end}
             className={({ isActive }) =>
-              `flex min-w-[4.5rem] flex-1 flex-col items-center justify-center gap-0.5 py-2.5 text-[11.5px] font-medium transition-colors ${
+              `flex min-w-[4.5rem] flex-1 flex-col items-center justify-center gap-0.5 py-2.5 text-[12px] font-medium transition-colors ${
                 isActive ? "text-[var(--color-teal-dark)]" : "text-[var(--color-ink-muted)]"
               }`
             }

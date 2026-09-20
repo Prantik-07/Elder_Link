@@ -7,9 +7,11 @@ import { CaregiverAvatar } from "./CaregiverAvatar";
 
 export function HandoffEventRow({
   event,
+  selected,
   onSelect,
 }: {
   event: CareEvent;
+  selected: boolean;
   onSelect: () => void;
 }) {
   const meta = CATEGORY_META[event.type];
@@ -21,18 +23,23 @@ export function HandoffEventRow({
       <button
         type="button"
         onClick={onSelect}
+        aria-current={selected}
         className="flex w-full items-start gap-3 rounded-xl border px-4 py-3 text-left transition-colors hover:bg-[var(--color-ivory-soft)]"
-        style={{ borderColor: "var(--color-line)" }}
+        style={{
+          borderColor: selected ? "var(--color-teal)" : "var(--color-line)",
+          backgroundColor: selected ? "var(--color-paper)" : undefined,
+          boxShadow: selected ? "var(--shadow-card)" : undefined,
+        }}
       >
         <span
-          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full"
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px]"
           style={{ backgroundColor: meta.iconBg, color: meta.iconColor }}
           aria-hidden="true"
         >
           <Icon size={16} strokeWidth={2} />
         </span>
         <span className="min-w-0 flex-1">
-          <span className="block text-[11px] font-semibold tracking-wide uppercase" style={{ color: meta.iconColor }}>
+          <span className="block text-[12px] font-semibold tracking-wide uppercase" style={{ color: meta.iconColor }}>
             {label}
           </span>
           <span className="font-display mt-0.5 block text-[14.5px] leading-snug text-[var(--color-ink)]">
