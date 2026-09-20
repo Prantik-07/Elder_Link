@@ -71,3 +71,5 @@ elderlink-test.*
 # Misc
 *.local
 *.backup
+# Local Vite/dev output
+*.err

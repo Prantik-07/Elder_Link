@@ -28,6 +28,7 @@ Existing tools ask caregivers to stop what they are doing and fill in forms. The
 3. **Nothing is silently trusted.** Every event links back to the exact transcript sentence it came from, and starts life as *needs verification*.
 4. **A human decides.** The caregiver reviews the evidence and marks it verified or keeps it uncertain. The decision is **saved to the backend**, so it survives refreshes and reaches the next caregiver.
 5. **The next shift sees what changed.** Care, Timeline and Handoff views read the same live API.
+6. **The circle is kept in the loop.** Flagging an update can email the rest of the Care Circle, and one workspace can hold several patients. (See *Honest status* for what is deployed.)
 
 ## What makes it different: a trust model, not just a transcriber
 
@@ -80,7 +81,7 @@ Every provider fails **loudly** with a safe, key-scrubbed error, and there is no
 - A recorded voice note in the browser becomes a persisted, evidence-linked Care Event in about 10 to 15 seconds.
 - Real speech is transcribed by **Groq `whisper-large-v3-turbo`**. The transcript artifact stores timed segments, and each event's evidence points at the exact transcript sentence it came from.
 - Verify and Keep Uncertain decisions **persist across refresh** via the least-privilege PATCH Lambda.
-- **487 automated backend tests**, with all HTTP mocked so none call a real provider. They cover every provider's error paths, key scrubbing and the full `process_audio` flow.
+- **498 automated backend tests**, with all HTTP mocked so none call a real provider. They cover every provider's error paths, key scrubbing and the full `process_audio` flow.
 - A Care Event **evaluation harness** ([`evaluation/`](evaluation)) scores extractors against 16 hand-written golden cases covering negation, secondhand claims, contradictions and unsupported inference.
 
 ## Honest status
@@ -94,6 +95,7 @@ We would rather you hear our limits from us.
 | LLM extraction (Amazon Bedrock) | Implemented and unit-tested, but **not enabled**. Our AWS account's Bedrock model access is still pending verification, so every invocation is rejected. Enabling it is a configuration switch (`EXTRACTION_PROVIDER=bedrock`). |
 | Hindi voice notes | Transcribed correctly, but the rule-based extractor cannot read Devanagari, so they produce a transcript and no events until LLM extraction is enabled. |
 | Audio timestamps in the UI | Groq's segment timings are saved in the transcript, but the event evidence does not display them yet (`startTime` / `endTime` are null in the API). |
+| Flag-to-email notifications | Implemented (`notify_flag` Lambda + SNS topic, with tests) and in the SAM template, but **not yet deployed** to the live stack; each recipient must also confirm an SNS subscription email. |
 | Auth / multi-tenant | Out of scope for the hackathon. One demo care recipient (`demo-dad`), and an open demo API with CORS pinned to the dev origin. |
 | Secrets | API keys are SAM `NoEcho` parameters injected only into the one Lambda that needs them. A production deployment should move them to Secrets Manager. |
 
@@ -118,11 +120,11 @@ The new event appears with its evidence panel. Mark it verified, refresh, and it
 
 ```bash
 python -m venv .venv && .venv/bin/pip install pytest boto3
-.venv/bin/python -m pytest -q                      # 487 passed
+.venv/bin/python -m pytest -q                      # 498 passed
 
 export GROQ_API_KEY=...                            # from your shell only, never committed
 .venv/bin/python backend/scripts/test_transcription.py \
-  --provider groq --audio-file elderlink-test.wav
+  --provider groq --audio-file path/to/any-short-recording.wav
 ```
 
 ### Deploy (AWS SAM)
@@ -146,7 +148,7 @@ backend/
   core/transcription/  Provider abstraction + Groq / Deepgram / OpenAI / Voxtral / Mock
   core/extraction/     Extraction pipeline, review policy, conflict detection, Bedrock + Mock
   core/persistence/    DynamoDB repository and frontend DTOs
-  lambdas/             audio_upload_url · process_audio · extract_events · get_timeline · update_care_event_status
+  lambdas/             audio_upload_url · process_audio · extract_events · get_timeline · update_care_event_status · notify_flag
 infra/               AWS SAM template + layer build scripts
 evaluation/          Golden cases + scoring harness for extractors
 docs/                Architecture and Care Event schema rationale

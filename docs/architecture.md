@@ -2,17 +2,19 @@
 
 ## System Overview
 
-### Full Intended Pipeline (Future)
+### Currently Deployed
 
 ```
-Browser → S3 → Lambda → Amazon Bedrock Voxtral → Transcript → Bedrock Extraction → Validation → DynamoDB → API Gateway → Frontend
+Browser → presigned PUT → S3 (audio/) → EventBridge → process_audio → TranscriptionProvider (Groq)
+  → S3 (transcripts/) → EventBridge → extract_events (validate + review policy) → DynamoDB
+  → HTTP API (GET timeline, PATCH status) → React
 ```
 
-### Currently Deployed (Day 1)
-
-```
-S3 (audio/) → EventBridge → Lambda → TranscriptionProvider (Mock/Voxtral) → S3 (transcripts/)
-```
+Transcription runs on Groq `whisper-large-v3-turbo` (Deepgram, OpenAI, Voxtral and Mock are selectable via
+`TRANSCRIPTION_PROVIDER`). Extraction runs on the deterministic `MockExtractionProvider`; the Bedrock
+extraction provider is implemented but not enabled because the AWS account's Bedrock model access is
+pending verification. See the root README for the current status table. The sections below describe the
+original Day 1 pipeline and remain accurate for the transcription stage.
 
 ## Service Roles
 

@@ -1,32 +1,19 @@
-# React + TypeScript + Vite
+# ElderLink frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+React + TypeScript + Vite caregiver UI: **Care** (what changed), **Timeline**, **Handoff** and **Care Circle**,
+plus the voice recorder that uploads audio to S3 through a presigned URL.
 
-Currently, two official plugins are available:
-
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
-
-## React Compiler
-
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the Oxlint configuration
-
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
-
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
-}
+```bash
+cp .env.example .env.local       # set VITE_ELDERLINK_API_URL to the deployed API
+npm install
+npm run dev                      # always http://localhost:5173 (strictPort)
+npm run build                    # type-check + production build
+npm run lint
 ```
 
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+- The deployed API and S3 bucket allow CORS **only** from `http://localhost:5173`, so the dev server is pinned to
+  that port and errors if it is busy (stop the other server with `kill $(lsof -ti tcp:5173)`).
+- `VITE_ELDERLINK_USE_MOCK_DATA=true` runs entirely on `src/data/mockEvents.ts`. In that mode the recorder
+  never sends audio anywhere; it just adds a canned event.
+- The browser never receives a transcription API key or AWS credentials. Do not add any `VITE_*` secret.
+- Microphone access needs `localhost` or HTTPS, and the browser's permission prompt to be allowed.
