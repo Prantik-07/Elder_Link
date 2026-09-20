@@ -21,7 +21,7 @@ const UPCOMING_ITEMS = [
 ];
 
 export function HandoffPage() {
-  const { events, isLoading, error, selectEvent } = useCareEvents();
+  const { events, isLoading, error, selectedId, toggleEvent } = useCareEvents();
   const [reviewOpen, setReviewOpen] = useState(false);
   const [confirmed, setConfirmed] = useState(false);
 
@@ -97,7 +97,12 @@ export function HandoffPage() {
           ) : (
             <ul className="flex flex-col gap-2">
               {importantChanges.map((e) => (
-                <HandoffEventRow key={e.id} event={e} onSelect={() => selectEvent(e.id)} />
+                <HandoffEventRow
+                  key={e.id}
+                  event={e}
+                  selected={e.id === selectedId}
+                  onSelect={() => toggleEvent(e.id)}
+                />
               ))}
             </ul>
           )}
@@ -116,7 +121,12 @@ export function HandoffPage() {
           ) : (
             <ul className="flex flex-col gap-2">
               {needsAttention.map((e) => (
-                <HandoffEventRow key={e.id} event={e} onSelect={() => selectEvent(e.id)} />
+                <HandoffEventRow
+                  key={e.id}
+                  event={e}
+                  selected={e.id === selectedId}
+                  onSelect={() => toggleEvent(e.id)}
+                />
               ))}
             </ul>
           )}

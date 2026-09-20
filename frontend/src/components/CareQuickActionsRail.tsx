@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import clsx from "clsx";
 import { useNavigate } from "react-router-dom";
 import { Bell, Heart, Mic, Upload, Users } from "lucide-react";
 import { useCareEvents } from "../state/CareEventsContext";
@@ -138,9 +139,12 @@ function ReminderCard() {
   );
 }
 
-export function CareQuickActionsRail() {
+export function CareQuickActionsRail({ className }: { className?: string }) {
   return (
-    <aside className="flex w-full flex-col gap-3.5 lg:w-80 lg:shrink-0" aria-label="Quick actions">
+    <aside
+      className={clsx("flex w-full flex-col gap-3.5 lg:w-80 lg:shrink-0", className)}
+      aria-label="Quick actions"
+    >
       <VoiceNoteCard />
       <NextHandoffCard />
       <TeamEffortCard />

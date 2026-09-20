@@ -7,9 +7,11 @@ import { CaregiverAvatar } from "./CaregiverAvatar";
 
 export function HandoffEventRow({
   event,
+  selected,
   onSelect,
 }: {
   event: CareEvent;
+  selected: boolean;
   onSelect: () => void;
 }) {
   const meta = CATEGORY_META[event.type];
@@ -21,8 +23,13 @@ export function HandoffEventRow({
       <button
         type="button"
         onClick={onSelect}
+        aria-current={selected}
         className="flex w-full items-start gap-3 rounded-xl border px-4 py-3 text-left transition-colors hover:bg-[var(--color-ivory-soft)]"
-        style={{ borderColor: "var(--color-line)" }}
+        style={{
+          borderColor: selected ? "var(--color-teal)" : "var(--color-line)",
+          backgroundColor: selected ? "var(--color-paper)" : undefined,
+          boxShadow: selected ? "var(--shadow-card)" : undefined,
+        }}
       >
         <span
           className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full"

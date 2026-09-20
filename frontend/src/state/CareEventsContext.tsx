@@ -33,6 +33,7 @@ interface CareEventsContextValue {
   visibleEvents: CareEvent[];
   selectedId: string | null;
   selectEvent: (id: string | null) => void;
+  toggleEvent: (id: string) => void;
   selectedEvent: CareEvent | null;
   setStatus: (id: string, status: CareEventStatus) => void;
   addEvent: (event: CareEvent) => void;
@@ -94,6 +95,10 @@ export function CareEventsProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const selectEvent = useCallback((id: string | null) => setSelectedId(id), []);
+  const toggleEvent = useCallback(
+    (id: string) => setSelectedId((prev) => (prev === id ? null : id)),
+    [],
+  );
 
   const toggleSortOrder = useCallback(() => {
     setSortOrder((prev) => (prev === "recent" ? "oldest" : "recent"));
@@ -145,6 +150,7 @@ export function CareEventsProvider({ children }: { children: ReactNode }) {
     visibleEvents,
     selectedId,
     selectEvent,
+    toggleEvent,
     selectedEvent,
     setStatus,
     addEvent,

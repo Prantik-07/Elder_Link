@@ -36,7 +36,7 @@ export function CareEventCard({
           selected
             ? {
                 backgroundColor: isFlagged ? "var(--color-amber-soft)" : "var(--color-paper)",
-                borderColor: isFlagged ? "var(--color-amber-line)" : "var(--color-line)",
+                borderColor: "var(--color-teal)",
               }
             : undefined
         }

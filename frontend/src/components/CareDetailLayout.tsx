@@ -1,7 +1,13 @@
 import type { ReactNode } from "react";
+import { AnimatePresence, motion } from "framer-motion";
 import { FileSearch } from "lucide-react";
 import { useCareEvents } from "../state/CareEventsContext";
-import { EvidencePanel } from "./EvidencePanel";
+import {
+  MobileEventSheet,
+  SelectedEvidence,
+  useEscapeToClose,
+  useSlideMotion,
+} from "./EventDetailPanel";
 
 function DetailPlaceholder() {
   return (
@@ -15,37 +21,31 @@ function DetailPlaceholder() {
 }
 
 export function CareDetailLayout({ children }: { children: ReactNode }) {
-  const { selectedEvent, selectEvent, setStatus } = useCareEvents();
+  const { selectedId } = useCareEvents();
+  const motionProps = useSlideMotion();
+  useEscapeToClose();
 
   return (
     <div className="mx-auto flex max-w-[1440px]">
       <div className="min-w-0 flex-1 px-4 py-5 sm:px-6 sm:py-7 lg:px-8 lg:py-9 xl:px-10">{children}</div>
 
+      {/* overflow-hidden clips the slide to the content area's right edge. */}
       <aside
-        className="sticky top-16 hidden h-[calc(100vh-4rem)] w-[28rem] shrink-0 border-l lg:block xl:w-[30rem]"
+        className="sticky top-16 hidden h-[calc(100vh-4rem)] w-[28rem] shrink-0 overflow-hidden border-l lg:block xl:w-[30rem]"
         style={{ borderColor: "var(--color-line)" }}
         aria-label="Event detail"
       >
-        {selectedEvent ? (
-          <EvidencePanel
-            event={selectedEvent}
-            onClose={() => selectEvent(null)}
-            onSetStatus={(status) => setStatus(selectedEvent.id, status)}
-          />
-        ) : (
-          <DetailPlaceholder />
-        )}
+        <DetailPlaceholder />
+        <AnimatePresence>
+          {selectedId && (
+            <motion.div className="absolute inset-0 bg-[var(--color-paper)]" {...motionProps}>
+              <SelectedEvidence />
+            </motion.div>
+          )}
+        </AnimatePresence>
       </aside>
 
-      {selectedEvent && (
-        <div className="fixed inset-0 z-40 bg-[var(--color-paper)] lg:hidden">
-          <EvidencePanel
-            event={selectedEvent}
-            onClose={() => selectEvent(null)}
-            onSetStatus={(status) => setStatus(selectedEvent.id, status)}
-          />
-        </div>
-      )}
+      <MobileEventSheet />
     </div>
   );
 }

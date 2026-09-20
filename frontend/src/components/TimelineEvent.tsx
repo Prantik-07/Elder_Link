@@ -59,7 +59,7 @@ export function TimelineEvent({
         )}
         style={
           selected
-            ? { backgroundColor: "var(--color-paper)", borderColor: "var(--color-line)" }
+            ? { backgroundColor: "var(--color-paper)", borderColor: "var(--color-teal)" }
             : undefined
         }
       >

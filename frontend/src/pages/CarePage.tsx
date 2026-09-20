@@ -1,4 +1,5 @@
 import { Sun } from "lucide-react";
+import clsx from "clsx";
 import { useCareEvents } from "../state/CareEventsContext";
 import { CareEventCard } from "../components/CareEventCard";
 import { FilterBar } from "../components/FilterBar";
@@ -20,11 +21,17 @@ export function CarePage() {
     sortOrder,
     toggleSortOrder,
     selectedId,
-    selectEvent,
+    toggleEvent,
   } = useCareEvents();
 
   return (
-    <div className="mx-auto max-w-[1400px] px-4 py-5 sm:px-6 sm:py-7 lg:px-8 lg:py-9 xl:px-10">
+    <div
+      className={clsx(
+        "relative mx-auto max-w-[1400px] px-4 py-5 transition-[padding] duration-[280ms] ease-out sm:px-6 sm:py-7 lg:px-8 lg:py-9 xl:px-10",
+        // Make room for the 26rem drawer so the page shifts left instead of sitting under it.
+        selectedId && "lg:pr-[calc(26rem+2rem)] xl:pr-[calc(26rem+2.5rem)]",
+      )}
+    >
       <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:gap-8">
         <div className="min-w-0 flex-1">
           <section className="flex items-start justify-between gap-8">
@@ -81,7 +88,7 @@ export function CarePage() {
                       key={event.id}
                       event={event}
                       selected={event.id === selectedId}
-                      onSelect={() => selectEvent(event.id)}
+                      onSelect={() => toggleEvent(event.id)}
                     />
                   ))}
                 </ul>
@@ -93,7 +100,8 @@ export function CarePage() {
           </div>
         </div>
 
-        <CareQuickActionsRail />
+        {/* Hidden (not unmounted, so an in-progress recording survives) while the detail panel is open. */}
+        <CareQuickActionsRail className={selectedId ? "lg:hidden" : undefined} />
       </div>
 
       <EventDetailDrawer />
