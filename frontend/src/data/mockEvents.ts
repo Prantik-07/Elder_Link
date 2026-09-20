@@ -148,4 +148,73 @@ export const mockCareEvents: CareEvent[] = [
       durationSeconds: 14,
     },
   },
+  // Second demo patient ("Mom"), so switching patients shows different data out of the box.
+  {
+    id: "mom-1",
+    patientId: "mom",
+    type: "vital",
+    title: "Blood sugar was a little high after breakfast.",
+    summary: "Reading of 168 mg/dL about two hours after eating.",
+    whatHappened:
+      "Priya checked Mom's blood sugar two hours after breakfast and it read 168 mg/dL. Mom felt fine and had no symptoms.",
+    occurredAt: today(10, 5),
+    reportedBy: "Priya (Caregiver)",
+    location: "At home",
+    status: "needs_verification",
+    verificationReason:
+      "The reading was taken quickly and not repeated, so it should be re-checked before the next handoff.",
+    evidence: {
+      segmentId: "mom-seg-1",
+      transcript:
+        "I checked Mom's sugar after breakfast, it was 168. She feels okay, no dizziness, but maybe we should check again later.",
+      durationSeconds: 14,
+    },
+  },
+  {
+    id: "mom-2",
+    patientId: "mom",
+    type: "medication",
+    title: "Evening thyroid tablet given on time.",
+    summary: "Thyroxine 50mcg given at 8:00 PM as usual.",
+    whatHappened: "Ramesh gave Mom her thyroxine 50mcg at 8:00 PM and watched her take it.",
+    occurredAt: yesterday(20, 0),
+    reportedBy: "Ramesh (Caregiver)",
+    location: "At home",
+    status: "verified",
+    evidence: {
+      segmentId: "mom-seg-2",
+      transcript: "Gave Mom her thyroid tablet at eight tonight, she took it with water. All good.",
+      durationSeconds: 9,
+    },
+  },
+  {
+    id: "mom-3",
+    patientId: "mom",
+    type: "observation",
+    title: "Mom walked to the garden and back on her own.",
+    summary: "Steady on her feet, no support needed.",
+    whatHappened:
+      "Shivaansh noticed Mom walk to the garden and back without her cane. She was steady and in good spirits.",
+    occurredAt: yesterday(17, 20),
+    reportedBy: "Shivaansh (Caregiver)",
+    location: "Garden",
+    status: "verified",
+    evidence: {
+      segmentId: "mom-seg-3",
+      transcript: "Mom walked out to the garden herself today, didn't even take the cane. She looked steady.",
+      durationSeconds: 11,
+    },
+  },
+  {
+    id: "mom-4",
+    patientId: "mom",
+    type: "appointment",
+    title: "Eye check-up booked for Friday.",
+    summary: "Appointment at 11:00 AM, needs someone to accompany her.",
+    whatHappened: "Priya booked Mom's eye check-up for Friday at 11:00 AM. Someone still needs to take her.",
+    occurredAt: daysAgo(2, 15, 40),
+    reportedBy: "Priya (Caregiver)",
+    status: "uncertain",
+    verificationReason: "Nobody has confirmed who will accompany Mom to the appointment yet.",
+  },
 ];

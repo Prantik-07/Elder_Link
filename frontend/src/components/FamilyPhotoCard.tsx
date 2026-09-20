@@ -4,7 +4,7 @@ import { Modal } from "./Modal";
 import { fileToResizedDataUrl, isSupportedImageFile } from "../lib/imageFile";
 
 const STORAGE_KEY = "elderlink.familyPhoto.v1";
-const CAPTION = "Dad & family";
+const CAPTION = "Family";
 // Shown until the caregiver adds their own photo - a warm illustration, not a
 // stand-in for an actual photo of anyone, so it can never be mistaken for one.
 const DEFAULT_ILLUSTRATION = "/assets/elder-tea.png";

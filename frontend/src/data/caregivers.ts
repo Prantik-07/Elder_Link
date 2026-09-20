@@ -4,7 +4,12 @@ export interface Caregiver {
   role: string;
   initials: string;
   color: string;
+  /** Where flag-for-review notifications are sent; optional until the caregiver adds it. */
+  email?: string;
 }
+
+/** The signed-in caregiver (no auth yet): never notified about their own actions. */
+export const CURRENT_CAREGIVER_ID = "shivaansh";
 
 // Derived from who actually appears as `reportedBy` on care events. There are
 // no real caregiver photos to show, so each person gets a consistent color +

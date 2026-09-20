@@ -13,15 +13,23 @@ export function Modal({
   maxWidthClass?: string;
 }) {
   const dialogRef = useRef<HTMLDivElement>(null);
+  // Callers pass a fresh onClose every render. Depending on it directly would
+  // re-run the effect on each keystroke and re-focus the dialog, stealing focus
+  // from the input being typed in.
+  const onCloseRef = useRef(onClose);
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  });
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
+      if (e.key === "Escape") onCloseRef.current();
     };
     document.addEventListener("keydown", onKeyDown);
-    dialogRef.current?.focus();
+    // Don't steal focus from a field that already autofocused.
+    if (!dialogRef.current?.contains(document.activeElement)) dialogRef.current?.focus();
     return () => document.removeEventListener("keydown", onKeyDown);
-  }, [onClose]);
+  }, []);
 
   return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">

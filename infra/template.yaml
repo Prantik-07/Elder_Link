@@ -534,6 +534,62 @@ Resources:
                   - s3:PutObject
                 Resource: !Sub ${AudioBucket.Arn}/audio/*
 
+  # Flag notifications: when a caregiver flags an event for review, the rest of
+  # that patient's Care Circle is emailed via SNS. One shared topic; each
+  # address is subscribed with a FilterPolicy on a `recipient` message
+  # attribute, so a publish reaches only its intended person. See
+  # backend/lambdas/notify_flag/handler.py.
+  FlagNotificationsTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: elderlink-flag-notifications
+      DisplayName: ElderLink
+
+  NotifyFlagFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: elderlink-notify-flag
+      CodeUri: ../backend/lambdas/notify_flag/
+      Handler: handler.lambda_handler
+      Role: !GetAtt NotifyFlagRole.Arn
+      Environment:
+        Variables:
+          FLAG_NOTIFICATIONS_TOPIC_ARN: !Ref FlagNotificationsTopic
+          ELDERLINK_AWS_REGION: us-east-1
+          ELDERLINK_CORS_ORIGIN: http://localhost:5173
+      Events:
+        NotifyFlag:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref CareEventsHttpApi
+            Path: /notifications/flag
+            Method: POST
+
+  NotifyFlagRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: ElderLinkNotifyFlagSnsAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              # Only this one topic; no wildcards.
+              - Effect: Allow
+                Action:
+                  - sns:Publish
+                  - sns:Subscribe
+                  - sns:ListSubscriptionsByTopic
+                Resource: !Ref FlagNotificationsTopic
+
   # CORS is also configured at the HTTP API level (in addition to the
   # headers GetTimelineFunction/AudioUploadUrlFunction themselves return)
   # so OPTIONS preflight requests are answered by API Gateway directly,
@@ -613,6 +669,12 @@ Outputs:
     Value: !Ref AudioUploadUrlFunction
     Export:
       Name: ElderLink-AudioUploadUrlFunctionName
+
+  FlagNotificationsTopicArn:
+    Description: SNS topic used to email a Care Circle when an update is flagged for review
+    Value: !Ref FlagNotificationsTopic
+    Export:
+      Name: ElderLink-FlagNotificationsTopicArn
 
   UpdateCareEventStatusFunctionName:
     Description: Name of the Day 5 verification-status write Lambda function

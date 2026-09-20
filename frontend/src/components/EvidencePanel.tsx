@@ -4,6 +4,8 @@ import type { CareEvent, CareEventStatus } from "../data/types";
 import { CATEGORY_META } from "../lib/categoryMeta";
 import { formatTimestamp } from "../lib/format";
 import { addNote, removeNote, useNotes } from "../lib/notes";
+import { notifyCircleOfFlag, type FlagNotifyOutcome } from "../lib/flagNotify";
+import { usePatients } from "../state/PatientsContext";
 import { StatusBadge } from "./StatusBadge";
 import { AudioEvidencePlayer } from "./AudioEvidencePlayer";
 
@@ -28,6 +30,9 @@ export function EvidencePanel({
   const label = event.categoryLabel ?? meta.label;
   const reason = event.verificationReason ?? REASON_COPY[event.status];
   const notes = useNotes(event.id);
+  const patientName = usePatients().activePatient?.name ?? "the patient";
+  const [flagOutcome, setFlagOutcome] = useState<FlagNotifyOutcome | "sending" | null>(null);
+
   const [noteOpen, setNoteOpen] = useState(false);
   const [draft, setDraft] = useState("");
 
@@ -42,20 +47,32 @@ export function EvidencePanel({
   const [pendingStatus, setPendingStatus] = useState<CareEventStatus | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
 
-  const handleSetStatus = async (status: CareEventStatus) => {
+  /** Resolves true only if the backend confirmed the write. */
+  const handleSetStatus = async (status: CareEventStatus): Promise<boolean> => {
     setPendingStatus(status);
     setSaveError(null);
     try {
       await onSetStatus(status);
+      return true;
     } catch (err) {
       // The write failed - the status shown above is still whatever the
       // backend last confirmed, never the attempted value, so this error
       // message is the only place the failure is visible. Never treat a
       // rejected save as if it succeeded.
       setSaveError(err instanceof Error ? err.message : "Couldn't save. Try again.");
+      return false;
     } finally {
       setPendingStatus(null);
     }
+  };
+
+  // The backend only persists "verified" and "uncertain", so flagging keeps the
+  // event unresolved ("uncertain") and then alerts the rest of the Care Circle.
+  // Nobody is notified unless the save actually succeeded.
+  const flagForReview = async () => {
+    if (!(await handleSetStatus("uncertain"))) return;
+    setFlagOutcome("sending");
+    setFlagOutcome(await notifyCircleOfFlag(event, patientName));
   };
 
   return (
@@ -243,13 +260,15 @@ export function EvidencePanel({
         </button>
         <button
           type="button"
-          onClick={() => handleSetStatus("uncertain")}
-          disabled={pendingStatus !== null}
+          onClick={flagForReview}
+          disabled={pendingStatus !== null || flagOutcome === "sending"}
           className="flex w-full items-center justify-center gap-1.5 rounded-full border px-4 py-3 text-[14px] font-semibold text-[var(--color-ink-soft)] transition-colors hover:text-[var(--color-ink)] disabled:opacity-60 sm:w-auto sm:py-2 sm:text-[13px]"
           style={{ borderColor: "var(--color-line)" }}
         >
-          {pendingStatus === "uncertain" && <Loader2 size={14} className="animate-spin" aria-hidden="true" />}
-          Keep Uncertain
+          {(pendingStatus === "uncertain" || flagOutcome === "sending") && (
+            <Loader2 size={14} className="animate-spin" aria-hidden="true" />
+          )}
+          Flag for review
         </button>
         {saveError && (
           <p className="w-full text-[12.5px] leading-snug text-[var(--color-concern)]" role="alert">
@@ -266,6 +285,18 @@ export function EvidencePanel({
           Add Note
         </button>
       </div>
+      {flagOutcome && (
+        <p
+          role="status"
+          className="border-t px-6 py-3 text-[13px] leading-snug"
+          style={{
+            borderColor: "var(--color-line)",
+            color: flagOutcome !== "sending" && flagOutcome.tone === "error" ? "var(--color-concern)" : "var(--color-ink-soft)",
+          }}
+        >
+          {flagOutcome === "sending" ? "Flagging and notifying the Care Circle..." : flagOutcome.message}
+        </p>
+      )}
     </div>
   );
 }
