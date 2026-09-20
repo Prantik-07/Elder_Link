@@ -1,173 +1,164 @@
+<div align="center">
+
+<img src="frontend/public/assets/logo.png" alt="ElderLink" width="88" />
+
 # ElderLink
 
-ElderLink turns caregiver voice notes into structured, persistent care context for easier caregiver handoffs.
+### Every voice note a caregiver sends becomes a trustworthy, evidence-backed care record, so no handoff starts from zero.
 
-## Problem
+**Speak → transcribe → structure → verify → hand off.**
+A serverless AWS pipeline, a safety-first data model, and a caregiver UI, running live.
 
-Caregivers communicate critical care information through informal voice notes (WhatsApp, voice memos, phone calls). This information is fragmented, ephemeral, and lost during handoffs — leading to missed medications, duplicated tasks, and care gaps.
+`React + Vite` · `S3` · `EventBridge` · `Lambda` · `DynamoDB` · `HTTP API` · `Groq Whisper` · `AWS SAM`
 
-## Solution
-
-ElderLink captures voice notes caregivers already send, transcribes them using Amazon Bedrock Voxtral, extracts structured Care Events using AI, validates them for safety, and stores them in a persistent timeline. Caregivers get a reliable "what changed" view at every handoff.
-
-## Core Workflow
-
-1. **Voice Note** — Caregiver records a voice note (existing behavior)
-2. **Upload** — Audio stored in S3 (`audio/<note-id>.wav`)
-3. **EventBridge** — S3 Object Created event routed to Lambda
-4. **Transcribe** — Lambda invokes Bedrock Voxtral (or Mock) for transcription
-5. **Store** — Transcript JSON written to S3 (`transcripts/<note-id>.json`)
-6. **Extract** — (Future) Bedrock structures transcript into Care Events
-7. **Validate** — (Future) Safety logic checks for critical issues
-8. **Persist** — (Future) Validated events written to DynamoDB
-9. **Surface** — (Future) Timeline, What Changed, and Care Handoff views via API
-
-## Current Deployed Pipeline (Day 1)
-
-```
-S3 (audio/) → EventBridge → Lambda → TranscriptionProvider → S3 (transcripts/)
-```
-
-| Component | Technology | Status |
-|-----------|------------|--------|
-| Audio Storage | S3 (private, encrypted, versioned) | ✅ Deployed |
-| Event Routing | EventBridge rule (`elderlink-s3-audio-created`) | ✅ Deployed |
-| Processing | Lambda (`elderlink-process-audio`, 60s timeout) | ✅ Deployed |
-| Transcription | MockTranscriptionProvider (default) | ✅ Working |
-| Transcription | VoxtralProvider (`mistral.voxtral-mini-3b-2507`) | ⏳ Pending AWS verification |
-| Transcript Output | S3 (`transcripts/<note-id>.json`) | ✅ Working |
-
-**Live Bedrock Voxtral inference is currently pending AWS account verification.**
-
-We are not adding AWS services merely to increase the service count.
-
-## Provider Selection
-
-The pipeline supports two transcription providers via `TRANSCRIPTION_PROVIDER` environment variable:
-
-| Value | Provider | Use Case |
-|-------|----------|----------|
-| `mock` | `MockTranscriptionProvider` | Default for deployed stack; deterministic local testing |
-| `voxtral` | `VoxtralProvider` | Production; requires AWS Bedrock access |
-
-**Default: `mock`** — The deployed stack uses the mock provider because AWS account verification is pending. When verification clears, switch to `voxtral` by updating the Lambda environment variable.
-
-Supported audio formats (must match Bedrock Converse's `AudioFormat` enum): `wav`, `mp3`, `flac`, `ogg`, `m4a`.
-
-## Known Limitations (Day 1)
-
-- **At-least-once delivery**: S3/EventBridge can redeliver the same `Object Created` event. The Lambda guards against this with a cheap `HeadObject` check on the target transcript key before doing any work — if a transcript already exists for that `note_id`, the invocation is a no-op. This is not a distributed lock; a rare race between two concurrent redeliveries could still both pass the check before either writes. Full idempotency (e.g. conditional writes) is out of scope for Day 1.
-- **Live Voxtral inference is blocked**: the AWS account is still pending verification for Bedrock model access, so only the `mock` provider has been exercised end-to-end in the deployed stack.
-
-## AWS Services
-
-- **S3** — Audio blob storage (private, encrypted, versioned)
-- **Lambda** — Stateless processing functions
-- **EventBridge** — Event routing from S3 to Lambda
-- **Amazon Bedrock** — Voxtral speech-to-text + LLM-based structured extraction (future)
-- **DynamoDB** — Care Event persistence (future)
-- **API Gateway** — HTTPS frontend access (future)
-
-## Safety Boundary
-
-ElderLink is **healthcare-adjacent coordination software**. It does **not**:
-
-- Diagnose conditions
-- Prescribe medications
-- Recommend treatment changes
-- Make clinical decisions
-- Replace professional medical judgment
-
-It structures information caregivers already communicate. All extracted events are attributed to the caregiver's voice note — ElderLink does not generate medical content.
-
-## Local Development
-
-```bash
-# Copy environment template
-cp .env.example .env
-
-# Fill in your values (AWS region, bucket name, etc.)
-
-# Test transcription locally with mock provider
-python backend/scripts/test_transcription.py --provider mock
-
-# When AWS verification clears, test with Voxtral
-# python backend/scripts/test_transcription.py --provider voxtral --audio-file <file.wav>
-```
-
-## Project Structure
-
-```
-elderlink/
-├── README.md
-├── .gitignore
-├── .env.example
-├── frontend/          # React + Vite caregiver UI (Care / Timeline / Handoff), mock CareEvent data
-├── backend/
-│   ├── core/
-│   │   └── transcription/  # Transcription abstraction (Voxtral + Mock)
-│   ├── lambdas/
-│   │   └── process_audio/  # Lambda handler for audio processing
-│   ├── scripts/            # Local test scripts
-│   └── tests/              # Unit tests
-├── infra/             # CloudFormation (SAM) templates
-├── evaluation/        # Prompt eval, accuracy benchmarks (TBD)
-├── demo/              # Demo scripts, sample data (TBD)
-└── docs/              # Architecture, decisions, runbooks
-```
-
-## Deployment
-
-```bash
-# Regenerate the Lambda layer content from the canonical source
-# (backend/core/transcription/ is the single source of truth; the layer
-# directory is generated, not hand-maintained)
-./infra/build_layer.sh
-
-# Package (packaged.yaml is a build artifact - not committed, regenerate as needed)
-cd infra
-aws cloudformation package --template-file template.yaml --s3-bucket elderlink-deploy-artifacts --output-template-file packaged.yaml
-
-# Deploy
-aws cloudformation deploy --template-file packaged.yaml --stack-name elderlink-audio-pipeline --capabilities CAPABILITY_IAM --region us-east-1
-
-# Get outputs
-aws cloudformation describe-stacks --stack-name elderlink-audio-pipeline --region us-east-1 --query 'Stacks[0].Outputs'
-```
-
-boto3/botocore are provided by the Lambda's managed Python 3.11 runtime and are not bundled into the function package.
-
-## Testing the Deployed Pipeline
-
-```bash
-# Upload test audio
-aws s3 cp elderlink-test.wav s3://<bucket-name>/audio/test-note.wav
-
-# Wait ~10-15 seconds for processing
-
-# Check transcript
-aws s3 cp s3://<bucket-name>/transcripts/test-note.json -
-```
-
-## Frontend
-
-The caregiver-facing UI (`frontend/`) is a standalone React + Vite app with three views - **Care** (what changed since your last handoff), **Timeline** (longitudinal record), and **Handoff** (what the next caregiver needs to know). It runs entirely on mock `CareEvent` data (`frontend/src/data/mockEvents.ts`) and is not wired to the AWS pipeline above - the backend's real output is a transcript JSON, not yet a structured Care Event, so there is nothing live to connect to until the Day 2 extraction step exists.
-
-```bash
-cd frontend
-npm install
-npm run dev
-```
-
-## Hackathon
-
-4-day build. Scope discipline is critical. Each day has a single focused deliverable:
-
-- **Day 1** — Foundation, transcription abstraction (Voxtral + Mock), AWS pipeline deployed with mock provider
-- **Day 2** — Bedrock extraction pipeline, DynamoDB schema, switch to Voxtral when verified
-- **Day 3** — API, Timeline/What Changed frontend
-- **Day 4** — Care Handoff view, demo hardening, evaluation
+</div>
 
 ---
 
-*Built for hackathon — not a production medical device.*
+## The problem nobody is building for
+
+Family caregivers already share the most important information about an elder's day through **voice notes**: "he skipped lunch", "my sister said he fell". That information is scattered across WhatsApp threads, forgotten by the next shift, and impossible to search. Handoffs fail, and medications get doubled or missed.
+
+Existing tools ask caregivers to stop what they are doing and fill in forms. They won't. **ElderLink meets caregivers where they already are: they just talk.**
+
+## What ElderLink does
+
+1. **Tap and speak.** A caregiver records a voice note in the browser.
+2. **It becomes structured care events.** The audio is transcribed, and each claim is extracted into a typed **Care Event** (medication, symptom, appointment, concern, …).
+3. **Nothing is silently trusted.** Every event links back to the exact transcript sentence it came from, and starts life as *needs verification*.
+4. **A human decides.** The caregiver reviews the evidence and marks it verified or keeps it uncertain. The decision is **saved to the backend**, so it survives refreshes and reaches the next caregiver.
+5. **The next shift sees what changed.** Care, Timeline and Handoff views read the same live API.
+
+## What makes it different: a trust model, not just a transcriber
+
+Most "AI note-taker" demos stop at a summary. In caregiving, a confident-sounding wrong summary is dangerous. ElderLink's core is a data model designed around **not overclaiming**:
+
+| Principle | How it is enforced in code |
+|---|---|
+| **Every claim cites evidence** | An event without a valid transcript-segment reference cannot be persisted (`core/care_event/validation.py`). |
+| **Claims are not facts** | Each event carries `claim_stance` (asserted, uncertain, negated) and `source_type` (firsthand, secondhand). "He did **not** miss his pills" is a first-class event, not silence. |
+| **AI never grants trust** | `review_state` and `verification_reason` are computed by a deterministic policy (`core/extraction/review_policy.py`), never taken from the model. Uncertain, secondhand, conflicting or weakly evidenced claims are flagged. Only a human action can make an event `verified`. |
+| **Contradictions are preserved** | Conflicting statements become two separate events with a `conflicting_information` flag, not one invented "resolution". |
+| **Humans write, narrowly** | The only write path is `PATCH …/care-events/{id}`. It accepts `verified` or `uncertain` and nothing else. The Lambda's IAM role is `dynamodb:UpdateItem` only, and other fields are immutable at the persistence layer. |
+| **No medical advice** | ElderLink structures what caregivers said. It does not diagnose, prescribe or recommend. |
+
+Read the reasoning in [`docs/care_event_schema.md`](docs/care_event_schema.md).
+
+## Architecture
+
+```mermaid
+flowchart LR
+  B["Browser<br/>MediaRecorder (webm / mp4)"] -- "1. POST /audio/upload-url" --> U["Lambda<br/>presign"]
+  U -- "presigned PUT URL" --> B
+  B -- "2. PUT audio (no AWS creds in browser)" --> S3[("S3<br/>audio/")]
+  S3 -- "Object Created" --> EB{{"EventBridge"}}
+  EB --> PA["Lambda<br/>process_audio"]
+  PA -- "TranscriptionProvider" --> T["Groq Whisper<br/>(swappable)"]
+  PA --> S3T[("S3<br/>transcripts/")]
+  S3T -- "Object Created" --> EB
+  EB --> EX["Lambda<br/>extract_events"]
+  EX -- "validate + review policy" --> DDB[("DynamoDB<br/>CareEvents")]
+  DDB --> API["HTTP API<br/>GET timeline · PATCH status"]
+  API --> R["React UI<br/>Care · Timeline · Handoff"]
+```
+
+Fully event-driven and serverless. Nothing sits idle on the backend, and the browser never holds an AWS credential or an API key.
+
+### Swappable at every seam
+
+Both AI stages sit behind small interfaces, so providers change with **one environment variable** and no code change:
+
+| Stage | Interface | Providers |
+|---|---|---|
+| Transcription | `TranscriptionProvider` | `groq` (deployed), `deepgram`, `openai`, `voxtral` (Amazon Bedrock), `mock` |
+| Extraction | `ExtractionProvider` | `mock` (deterministic rules, deployed), `bedrock` (implemented) |
+
+Every provider fails **loudly** with a safe, key-scrubbed error, and there is no silent fallback to mock. A failed transcription is recorded as `status: failed` and never becomes a fabricated event.
+
+## Proven on a live AWS stack
+
+- A recorded voice note in the browser becomes a persisted, evidence-linked Care Event in about 10 to 15 seconds.
+- Real speech is transcribed by **Groq `whisper-large-v3-turbo`**. The transcript artifact stores timed segments, and each event's evidence points at the exact transcript sentence it came from.
+- Verify and Keep Uncertain decisions **persist across refresh** via the least-privilege PATCH Lambda.
+- **487 automated backend tests**, with all HTTP mocked so none call a real provider. They cover every provider's error paths, key scrubbing and the full `process_audio` flow.
+- A Care Event **evaluation harness** ([`evaluation/`](evaluation)) scores extractors against 16 hand-written golden cases covering negation, secondhand claims, contradictions and unsupported inference.
+
+## Honest status
+
+We would rather you hear our limits from us.
+
+| Area | State |
+|---|---|
+| Voice → transcript (Groq) | Live and verified on real audio |
+| Transcript → Care Events | Live, using a **deterministic rule-based extractor**. It handles English caregiver phrasing, and its keyword matching is intentionally simple. |
+| LLM extraction (Amazon Bedrock) | Implemented and unit-tested, but **not enabled**. Our AWS account's Bedrock model access is still pending verification, so every invocation is rejected. Enabling it is a configuration switch (`EXTRACTION_PROVIDER=bedrock`). |
+| Hindi voice notes | Transcribed correctly, but the rule-based extractor cannot read Devanagari, so they produce a transcript and no events until LLM extraction is enabled. |
+| Audio timestamps in the UI | Groq's segment timings are saved in the transcript, but the event evidence does not display them yet (`startTime` / `endTime` are null in the API). |
+| Auth / multi-tenant | Out of scope for the hackathon. One demo care recipient (`demo-dad`), and an open demo API with CORS pinned to the dev origin. |
+| Secrets | API keys are SAM `NoEcho` parameters injected only into the one Lambda that needs them. A production deployment should move them to Secrets Manager. |
+
+## Try it
+
+### Run the app
+
+```bash
+cd frontend
+cp .env.example .env.local        # set VITE_ELDERLINK_API_URL to the deployed API
+npm install
+npm run dev -- --port 5173 --strictPort   # the backend allows this origin
+```
+
+No backend? Set `VITE_ELDERLINK_USE_MOCK_DATA=true` for a fully local UI on sample data.
+
+Click **Tap to speak** and say something like:
+*"My sister is ill today. She needs to see the doctor tomorrow."*
+The new event appears with its evidence panel. Mark it verified, refresh, and it stays verified.
+
+### Run the tests and the transcription smoke test
+
+```bash
+python -m venv .venv && .venv/bin/pip install pytest boto3
+.venv/bin/python -m pytest -q                      # 487 passed
+
+export GROQ_API_KEY=...                            # from your shell only, never committed
+.venv/bin/python backend/scripts/test_transcription.py \
+  --provider groq --audio-file elderlink-test.wav
+```
+
+### Deploy (AWS SAM)
+
+```bash
+bash infra/build_layer.sh && bash infra/build_extraction_layer.sh
+sam build --template-file infra/template.yaml
+sam deploy --stack-name elderlink-audio-pipeline --region us-east-1 \
+  --capabilities CAPABILITY_IAM --resolve-s3 \
+  --parameter-overrides TranscriptionProviderName=groq GroqApiKey="$GROQ_API_KEY"
+```
+
+`TranscriptionProviderName=mock` (the default) needs no key and is the one-line rollback.
+
+## Repository map
+
+```
+frontend/            React + Vite caregiver UI (Care · Timeline · Handoff · Care Circle)
+backend/
+  core/care_event/     Canonical schema, validation, normalization, TranscriptDocument
+  core/transcription/  Provider abstraction + Groq / Deepgram / OpenAI / Voxtral / Mock
+  core/extraction/     Extraction pipeline, review policy, conflict detection, Bedrock + Mock
+  core/persistence/    DynamoDB repository and frontend DTOs
+  lambdas/             audio_upload_url · process_audio · extract_events · get_timeline · update_care_event_status
+infra/               AWS SAM template + layer build scripts
+evaluation/          Golden cases + scoring harness for extractors
+docs/                Architecture and Care Event schema rationale
+demo/                Pre-written transcripts for a scripted live demo
+```
+
+## Safety boundary
+
+ElderLink is **coordination software, not a medical device**. It never diagnoses, prescribes, recommends treatment or replaces professional judgment. It organizes what caregivers already said, attributes it to them, cites the evidence, and asks a human to confirm.
+
+---
+
+<div align="center">
+Built in a hackathon for the people who quietly hold a family together.
+</div>
