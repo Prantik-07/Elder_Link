@@ -17,6 +17,25 @@ A serverless AWS pipeline, a safety-first data model, and a caregiver UI, runnin
 
 ---
 
+## Live demo
+
+| | |
+|---|---|
+| **App (public HTTPS)** | https://main.d1q63nhpu2yil8.amplifyapp.com |
+| **API** | https://zu35plf1yb.execute-api.us-east-1.amazonaws.com |
+| **Sample API call** | `GET /care-recipients/demo-dad/timeline` |
+| **Hosting** | AWS Amplify Hosting (frontend) · AWS SAM stack `elderlink-audio-pipeline` in `us-east-1` (backend) |
+| **Demo care recipient** | `demo-dad` |
+
+**Try it in 60 seconds**
+
+1. Open the app and go to **Timeline** (deep links work, e.g. `/timeline`).
+2. Tap **Tap to speak**, record a short note and stop. It is uploaded straight to S3 and turns into a Care Event.
+3. Open the event, review its evidence, and mark it **Verified** or **Keep uncertain**. The decision is saved to the backend.
+4. In **Care Circle**, add a caregiver email, then flag an event. Confirm the one-time SNS subscription email, flag again, and the alert email arrives.
+
+**Read this before judging:** the deployed stack runs the `mock` transcription and extraction providers, so a recording produces a canned sample transcript, not the words you spoke. There is no authentication (open demo API), and Care Circle and patients are stored in your browser. Details are in [Honest status](#honest-status).
+
 ## The problem nobody is building for
 
 Family caregivers already share the most important information about an elder's day through **voice notes**: "he skipped lunch", "my sister said he fell". That information is scattered across WhatsApp threads, forgotten by the next shift, and impossible to search. Handoffs fail, and medications get doubled or missed.
