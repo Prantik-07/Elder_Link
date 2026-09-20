@@ -2,6 +2,28 @@ AWSTemplateFormatVersion: '2010-09-09'
 Transform: AWS::Serverless-2016-10-31
 Description: ElderLink Audio Processing Pipeline - S3 -> EventBridge -> Lambda -> Transcription -> S3
 
+Parameters:
+  TranscriptionProviderName:
+    Type: String
+    Default: mock
+    AllowedValues: [mock, voxtral, deepgram, openai, groq]
+    Description: Transcription provider for ProcessAudioFunction (mock keeps working with no Deepgram key)
+  DeepgramApiKey:
+    Type: String
+    NoEcho: true
+    Default: ''
+    Description: Deepgram API key, injected only into ProcessAudioFunction. Required when TranscriptionProviderName=deepgram. Never commit a value.
+  OpenAiApiKey:
+    Type: String
+    NoEcho: true
+    Default: ''
+    Description: OpenAI API key, injected only into ProcessAudioFunction. Required when TranscriptionProviderName=openai. Never commit a value.
+  GroqApiKey:
+    Type: String
+    NoEcho: true
+    Default: ''
+    Description: Groq API key, injected only into ProcessAudioFunction. Required when TranscriptionProviderName=groq. Never commit a value.
+
 Globals:
   Function:
     Timeout: 60
@@ -70,7 +92,10 @@ Resources:
         - !Ref TranscriptionLayer
       Environment:
         Variables:
-          TRANSCRIPTION_PROVIDER: mock
+          TRANSCRIPTION_PROVIDER: !Ref TranscriptionProviderName
+          DEEPGRAM_API_KEY: !Ref DeepgramApiKey
+          OPENAI_API_KEY: !Ref OpenAiApiKey
+          GROQ_API_KEY: !Ref GroqApiKey
           ELDERLINK_AWS_REGION: us-east-1
           BEDROCK_MODEL_ID: mistral.voxtral-mini-3b-2507
           AUDIO_BUCKET_NAME: !Ref AudioBucket
@@ -393,6 +418,64 @@ Resources:
                   - !GetAtt CareEventsTable.Arn
                   - !Sub ${CareEventsTable.Arn}/index/CareTimelineIndex
 
+  # Day 5: the one supported write path for an already-persisted CareEvent -
+  # fixes the "verification status is only ever client-side React state"
+  # gap the frontend forensic audit found. Deliberately narrow: the request
+  # can only set `status` to "verified" or "uncertain" (see
+  # update_care_event_status/handler.py); every other canonical CareEvent
+  # field is immutable via this route, enforced at the persistence layer by
+  # CareEventRepository.update_review_state, not merely by this handler
+  # choosing not to expose the other fields.
+  UpdateCareEventStatusFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: elderlink-update-care-event-status
+      CodeUri: ../backend/lambdas/update_care_event_status/
+      Handler: handler.lambda_handler
+      Role: !GetAtt UpdateCareEventStatusRole.Arn
+      Layers:
+        - !Ref ExtractionLayer
+      Environment:
+        Variables:
+          CARE_EVENTS_TABLE_NAME: !Ref CareEventsTable
+          ELDERLINK_AWS_REGION: us-east-1
+          ELDERLINK_CORS_ORIGIN: http://localhost:5173
+      Events:
+        UpdateCareEventStatus:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref CareEventsHttpApi
+            Path: /care-recipients/{care_recipient_id}/care-events/{event_id}
+            Method: PATCH
+
+  UpdateCareEventStatusRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: ElderLinkUpdateCareEventStatusDynamoDbAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              # UpdateItem only, scoped to the base table by primary key -
+              # never PutItem (which could create a new item outside
+              # put_event's extraction-provenance path) and never
+              # Query/Scan/DeleteItem/GSI or LSI access. This function
+              # can only flip review_state/verification_reason on an
+              # event that already exists.
+              - Effect: Allow
+                Action:
+                  - dynamodb:UpdateItem
+                Resource: !GetAtt CareEventsTable.Arn
+
   # Day 4: the ingestion bridge - signs a presigned S3 PutObject URL under
   # audio/ so the browser's VoiceRecorder can upload a real recording
   # directly to S3. This Lambda never touches audio bytes, transcription,
@@ -465,6 +548,7 @@ Resources:
         AllowMethods:
           - GET
           - POST
+          - PATCH
           - OPTIONS
         AllowHeaders:
           - Content-Type
@@ -529,3 +613,9 @@ Outputs:
     Value: !Ref AudioUploadUrlFunction
     Export:
       Name: ElderLink-AudioUploadUrlFunctionName
+
+  UpdateCareEventStatusFunctionName:
+    Description: Name of the Day 5 verification-status write Lambda function
+    Value: !Ref UpdateCareEventStatusFunction
+    Export:
+      Name: ElderLink-UpdateCareEventStatusFunctionName

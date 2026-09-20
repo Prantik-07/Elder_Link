@@ -117,6 +117,14 @@ def _verification_reason_to_item(vr: Optional[VerificationReason]) -> Optional[d
     return {"code": vr.code.value, "detail": vr.detail}
 
 
+def verification_reason_to_item(vr: Optional[VerificationReason]) -> Optional[dict]:
+    """Public alias of _verification_reason_to_item, for callers outside
+    this module that need to serialize a single field (e.g.
+    CareEventRepository.update_review_state's targeted UpdateItem) without
+    round-tripping a whole CareEvent through to_item."""
+    return _verification_reason_to_item(vr)
+
+
 def _verification_reason_from_item(item: Optional[dict]) -> Optional[VerificationReason]:
     if item is None:
         return None

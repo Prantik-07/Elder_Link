@@ -58,10 +58,29 @@ class TestCareEventToDto:
         dto = care_event_to_dto(_record())
         assert dto["occurredAt"] == "2024-01-01T06:32:00Z"
 
-    def test_date_precision_occurred_at_widened_to_midnight_utc(self):
+    def test_date_precision_occurred_at_widened_to_noon_utc(self):
+        # Noon UTC, not midnight UTC: midnight UTC renders as the PREVIOUS
+        # calendar day in any timezone west of UTC (e.g. US timezones),
+        # which would misrepresent a known DATE as the wrong date once the
+        # frontend formats it locally. Noon UTC keeps the same calendar
+        # date across every real-world timezone offset.
         record = _record(occurred_at=TemporalInfo(precision=TemporalPrecision.DATE, date="2024-02-05"))
         dto = care_event_to_dto(record)
-        assert dto["occurredAt"] == "2024-02-05T00:00:00Z"
+        assert dto["occurredAt"] == "2024-02-05T12:00:00Z"
+
+    def test_date_precision_does_not_shift_calendar_day_in_negative_offset_timezones(self):
+        # A regression guard for the actual bug: simulate a US Pacific
+        # caregiver (UTC-8) reading this ISO string locally. With the old
+        # midnight-UTC behavior this would land on 2024-02-04 (the wrong
+        # day); noon UTC keeps it on 2024-02-05 for any offset from
+        # UTC-11 through UTC+12.
+        from datetime import datetime, timedelta, timezone
+
+        record = _record(occurred_at=TemporalInfo(precision=TemporalPrecision.DATE, date="2024-02-05"))
+        dto = care_event_to_dto(record)
+        instant = datetime.fromisoformat(dto["occurredAt"].replace("Z", "+00:00"))
+        pacific = instant.astimezone(timezone(timedelta(hours=-8)))
+        assert pacific.date().isoformat() == "2024-02-05"
 
     def test_unknown_precision_falls_back_to_created_at(self):
         record = _record(occurred_at=TemporalInfo.unknown())
@@ -74,6 +93,33 @@ class TestCareEventToDto:
         )
         dto = care_event_to_dto(record)
         assert dto["occurredAt"] == "2024-01-01T06:33:00Z"
+
+    def test_occurred_at_precision_reflects_exact_timestamp(self):
+        dto = care_event_to_dto(_record())
+        assert dto["occurredAtPrecision"] == "exact_timestamp"
+
+    def test_occurred_at_precision_reflects_date(self):
+        record = _record(occurred_at=TemporalInfo(precision=TemporalPrecision.DATE, date="2024-02-05"))
+        dto = care_event_to_dto(record)
+        assert dto["occurredAtPrecision"] == "date"
+
+    def test_occurred_at_precision_flags_relative_fallback(self):
+        # This is the "should not silently masquerade as an exact
+        # timestamp" fix: occurredAt itself still falls back to
+        # created_at (a required, always-valid-instant field), but
+        # occurredAtPrecision now tells a caller that fallback happened,
+        # rather than leaving it indistinguishable from a real reported
+        # time.
+        record = _record(
+            occurred_at=TemporalInfo(precision=TemporalPrecision.RELATIVE, expression="this morning")
+        )
+        dto = care_event_to_dto(record)
+        assert dto["occurredAtPrecision"] == "relative"
+
+    def test_occurred_at_precision_flags_unknown_fallback(self):
+        record = _record(occurred_at=TemporalInfo.unknown())
+        dto = care_event_to_dto(record)
+        assert dto["occurredAtPrecision"] == "unknown"
 
     def test_evidence_maps_first_segment_with_duration(self):
         dto = care_event_to_dto(_record())

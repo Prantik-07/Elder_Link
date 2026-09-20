@@ -11,8 +11,15 @@ from backend.core.care_event import (
     ReviewState,
     SourceType,
     TemporalInfo,
+    VerificationReason,
+    VerificationReasonCode,
 )
-from backend.core.persistence import CareContext, CareEventRepository, PersistenceValidationError
+from backend.core.persistence import (
+    CareContext,
+    CareEventNotFoundError,
+    CareEventRepository,
+    PersistenceValidationError,
+)
 
 from .fake_table import FakeCareEventsTable
 
@@ -262,6 +269,90 @@ class TestInvalidCanonicalEventRejection:
         with pytest.raises(PersistenceValidationError, match="evidence"):
             repo.put_event(make_event(evidence=[]), make_context(), "care_event_v2")
         assert table.update_item_calls == 0
+
+
+class TestUpdateReviewState:
+    def test_valid_status_update_persists_review_state(self):
+        repo, _table = make_repository()
+        repo.put_event(make_event(event_id="ce_1"), make_context(), "care_event_v2")
+
+        updated = repo.update_review_state("patient-1", "ce_1", ReviewState.VERIFIED)
+        assert updated.event.review_state == ReviewState.VERIFIED
+
+    def test_verification_reason_is_persisted_when_provided(self):
+        repo, _table = make_repository()
+        repo.put_event(make_event(event_id="ce_1"), make_context(), "care_event_v2")
+
+        reason = VerificationReason(code=VerificationReasonCode.OTHER, detail="kept flagged")
+        updated = repo.update_review_state("patient-1", "ce_1", ReviewState.NEEDS_VERIFICATION, reason)
+        assert updated.event.verification_reason == reason
+
+    def test_verification_reason_is_cleared_when_not_provided(self):
+        repo, _table = make_repository()
+        repo.put_event(make_event(event_id="ce_1"), make_context(), "care_event_v2")
+        reason = VerificationReason(code=VerificationReasonCode.OTHER, detail="kept flagged")
+        repo.update_review_state("patient-1", "ce_1", ReviewState.NEEDS_VERIFICATION, reason)
+
+        # Marking verified afterwards clears the now-stale reason.
+        updated = repo.update_review_state("patient-1", "ce_1", ReviewState.VERIFIED)
+        assert updated.event.verification_reason is None
+
+    def test_nonexistent_event_raises_not_found(self):
+        repo, _table = make_repository()
+        with pytest.raises(CareEventNotFoundError):
+            repo.update_review_state("patient-1", "does-not-exist", ReviewState.VERIFIED)
+
+    def test_nonexistent_event_does_not_create_a_new_item(self):
+        repo, table = make_repository()
+        with pytest.raises(CareEventNotFoundError):
+            repo.update_review_state("patient-1", "does-not-exist", ReviewState.VERIFIED)
+        assert len(table.items) == 0
+
+    def test_only_review_state_and_verification_reason_change(self):
+        # The canonical fields extraction produced must be untouched by a
+        # review action - this is the "cannot arbitrarily mutate the
+        # canonical CareEvent" guarantee at the persistence layer.
+        repo, _table = make_repository()
+        original = repo.put_event(
+            make_event(event_id="ce_1", summary="original summary", subject="Dad"),
+            make_context(),
+            "care_event_v2",
+        )
+        updated = repo.update_review_state("patient-1", "ce_1", ReviewState.VERIFIED)
+
+        assert updated.event.summary == original.event.summary
+        assert updated.event.subject == original.event.subject
+        assert updated.event.event_type == original.event.event_type
+        assert updated.event.claim_stance == original.event.claim_stance
+        assert updated.event.source_type == original.event.source_type
+        assert updated.event.evidence == original.event.evidence
+        assert updated.context.transcript_id == original.context.transcript_id
+
+    def test_created_at_is_not_changed_by_a_review_action(self):
+        repo, _table = make_repository()
+        original = repo.put_event(make_event(event_id="ce_1"), make_context(), "care_event_v2")
+        updated = repo.update_review_state("patient-1", "ce_1", ReviewState.VERIFIED)
+        assert updated.created_at == original.created_at
+
+    def test_updated_at_advances_on_a_review_action(self):
+        repo, table = make_repository()
+        repo.put_event(make_event(event_id="ce_1"), make_context(), "care_event_v2")
+        table.items[("PATIENT#patient-1", "EVENT#ce_1")]["updated_at"] = "2020-01-01T00:00:00Z"
+        updated = repo.update_review_state("patient-1", "ce_1", ReviewState.VERIFIED)
+        assert updated.updated_at > "2020-01-01T00:00:00Z"
+
+    def test_round_trip_survives_a_fresh_repository_instance(self):
+        # Simulates "survives browser refresh": a brand new repository
+        # object (as a fresh Lambda invocation would construct) reading
+        # back what a previous invocation wrote.
+        table = FakeCareEventsTable()
+        writer = CareEventRepository(table=table)
+        writer.put_event(make_event(event_id="ce_1"), make_context(), "care_event_v2")
+        writer.update_review_state("patient-1", "ce_1", ReviewState.VERIFIED)
+
+        reader = CareEventRepository(table=table)
+        timeline = reader.get_timeline("patient-1")
+        assert timeline[0].event.review_state == ReviewState.VERIFIED
 
 
 class TestDynamoDbErrorPropagation:

@@ -1,4 +1,3 @@
-import { Phone } from "lucide-react";
 import { CAREGIVERS } from "../data/caregivers";
 import { CaregiverAvatar } from "../components/CaregiverAvatar";
 
@@ -32,14 +31,6 @@ export function CareCirclePage() {
               <p className="text-[14.5px] font-medium text-[var(--color-ink)]">{c.name}</p>
               <p className="text-[12.5px] text-[var(--color-ink-muted)]">{c.role}</p>
             </div>
-            <button
-              type="button"
-              aria-label={`Contact ${c.name}`}
-              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full transition-colors hover:bg-[var(--color-ivory-soft)]"
-              style={{ color: "var(--color-teal)" }}
-            >
-              <Phone size={16} aria-hidden="true" />
-            </button>
           </li>
         ))}
       </ul>

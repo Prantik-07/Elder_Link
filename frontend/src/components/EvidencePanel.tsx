@@ -1,4 +1,5 @@
-import { Calendar, Check, CircleHelp, MapPin, StickyNote, User, X } from "lucide-react";
+import { useState } from "react";
+import { Calendar, CircleHelp, Check, Loader2, MapPin, User, X } from "lucide-react";
 import type { CareEvent, CareEventStatus } from "../data/types";
 import { CATEGORY_META } from "../lib/categoryMeta";
 import { formatTimestamp } from "../lib/format";
@@ -19,12 +20,31 @@ export function EvidencePanel({
 }: {
   event: CareEvent;
   onClose?: () => void;
-  onSetStatus: (status: CareEventStatus) => void;
+  onSetStatus: (status: CareEventStatus) => Promise<void>;
 }) {
   const meta = CATEGORY_META[event.type];
   const Icon = meta.icon;
   const label = event.categoryLabel ?? meta.label;
   const reason = event.verificationReason ?? REASON_COPY[event.status];
+
+  const [pendingStatus, setPendingStatus] = useState<CareEventStatus | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
+
+  const handleSetStatus = async (status: CareEventStatus) => {
+    setPendingStatus(status);
+    setSaveError(null);
+    try {
+      await onSetStatus(status);
+    } catch (err) {
+      // The write failed - the status shown above is still whatever the
+      // backend last confirmed, never the attempted value, so this error
+      // message is the only place the failure is visible. Never treat a
+      // rejected save as if it succeeded.
+      setSaveError(err instanceof Error ? err.message : "Couldn't save. Try again.");
+    } finally {
+      setPendingStatus(null);
+    }
+  };
 
   return (
     <div className="flex h-full flex-col">
@@ -137,29 +157,33 @@ export function EvidencePanel({
       >
         <button
           type="button"
-          onClick={() => onSetStatus("verified")}
-          className="flex w-full items-center justify-center gap-1.5 rounded-full px-4 py-3 text-[14px] font-semibold text-[var(--color-paper)] transition-opacity hover:opacity-90 sm:w-auto sm:py-2 sm:text-[13px]"
+          onClick={() => handleSetStatus("verified")}
+          disabled={pendingStatus !== null}
+          className="flex w-full items-center justify-center gap-1.5 rounded-full px-4 py-3 text-[14px] font-semibold text-[var(--color-paper)] transition-opacity hover:opacity-90 disabled:opacity-60 sm:w-auto sm:py-2 sm:text-[13px]"
           style={{ backgroundColor: "var(--color-teal)" }}
         >
-          <Check size={14} aria-hidden="true" />
+          {pendingStatus === "verified" ? (
+            <Loader2 size={14} className="animate-spin" aria-hidden="true" />
+          ) : (
+            <Check size={14} aria-hidden="true" />
+          )}
           Mark as Verified
         </button>
         <button
           type="button"
-          onClick={() => onSetStatus("uncertain")}
-          className="w-full rounded-full border px-4 py-3 text-[14px] font-semibold text-[var(--color-ink-soft)] transition-colors hover:text-[var(--color-ink)] sm:w-auto sm:py-2 sm:text-[13px]"
+          onClick={() => handleSetStatus("uncertain")}
+          disabled={pendingStatus !== null}
+          className="flex w-full items-center justify-center gap-1.5 rounded-full border px-4 py-3 text-[14px] font-semibold text-[var(--color-ink-soft)] transition-colors hover:text-[var(--color-ink)] disabled:opacity-60 sm:w-auto sm:py-2 sm:text-[13px]"
           style={{ borderColor: "var(--color-line)" }}
         >
+          {pendingStatus === "uncertain" && <Loader2 size={14} className="animate-spin" aria-hidden="true" />}
           Keep Uncertain
         </button>
-        <button
-          type="button"
-          className="flex w-full items-center justify-center gap-1.5 rounded-full border px-4 py-3 text-[14px] font-semibold text-[var(--color-ink-soft)] transition-colors hover:text-[var(--color-ink)] sm:w-auto sm:py-2 sm:text-[13px]"
-          style={{ borderColor: "var(--color-line)" }}
-        >
-          <StickyNote size={14} aria-hidden="true" />
-          Add Note
-        </button>
+        {saveError && (
+          <p className="w-full text-[12.5px] leading-snug text-[var(--color-concern)]" role="alert">
+            {saveError}
+          </p>
+        )}
       </div>
     </div>
   );

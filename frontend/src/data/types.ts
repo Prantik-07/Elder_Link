@@ -33,6 +33,14 @@ export interface CareEvent {
   summary: string;
   whatHappened: string;
   occurredAt: string;
+  /**
+   * Which canonical precision actually produced `occurredAt`:
+   * "exact_timestamp" | "date" | "relative" | "unknown". "relative"/
+   * "unknown" mean occurredAt fell back to when the note was processed,
+   * not a real reported time - present so that distinction isn't lost,
+   * even though today's UI doesn't yet branch on it.
+   */
+  occurredAtPrecision?: string;
   reportedBy: string;
   location?: string;
   status: CareEventStatus;

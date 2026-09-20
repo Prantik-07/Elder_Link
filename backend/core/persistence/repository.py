@@ -39,18 +39,26 @@ from datetime import datetime, timezone
 from typing import Optional
 
 import boto3
+from botocore.exceptions import ClientError
 
-from backend.core.care_event import CareEvent
+from backend.core.care_event import CareEvent, ReviewState, VerificationReason
 
 from .context import CareContext
-from .keys import patient_pk
-from .serialization import CareEventRecord, from_item, to_item
+from .keys import event_sk, patient_pk
+from .serialization import CareEventRecord, from_item, to_item, verification_reason_to_item
 
 
 class PersistenceValidationError(ValueError):
     def __init__(self, errors: list[str]):
         self.errors = errors
         super().__init__("; ".join(errors))
+
+
+class CareEventNotFoundError(LookupError):
+    """Raised by update_review_state when (care_recipient_id, event_id)
+    doesn't already exist. Deliberately distinct from a generic
+    ClientError so callers (the update_care_event_status Lambda) can map
+    it to a clean 404 without inspecting AWS error codes themselves."""
 
 
 def _check_persistable(event: CareEvent, context: CareContext) -> list[str]:
@@ -120,6 +128,65 @@ class CareEventRepository:
             ExpressionAttributeValues=values,
             ReturnValues="ALL_NEW",
         )
+        return from_item(response["Attributes"])
+
+    def update_review_state(
+        self,
+        care_recipient_id: str,
+        event_id: str,
+        review_state: ReviewState,
+        verification_reason: Optional[VerificationReason] = None,
+    ) -> CareEventRecord:
+        """The one supported write path for an already-persisted CareEvent
+        (Day 5: caregiver "Mark as Verified" / "Keep Uncertain" actions).
+
+        Deliberately narrow: only review_state and verification_reason can
+        change. event_type, summary, claim_stance, source_type, evidence,
+        occurred_at, reported_by are never touched here - a caregiver
+        review action can change whether a claim has been checked, never
+        what was actually extracted from the transcript. created_at is
+        untouched (it is set once, at put_event); updated_at advances.
+
+        Uses a ConditionExpression rather than put_event's if_not_exists
+        upsert semantics: this method must never create a new item for an
+        (care_recipient_id, event_id) pair that doesn't already exist -
+        that would silently invent a CareEvent with no evidence, no
+        transcript_id, no extraction provenance. Raises
+        CareEventNotFoundError instead.
+        """
+        now = _now_iso()
+        names = {
+            "#review_state": "review_state",
+            "#updated_at": "updated_at",
+            "#verification_reason": "verification_reason",
+        }
+        values = {
+            ":review_state": review_state.value,
+            ":updated_at": now,
+        }
+        set_clauses = ["#review_state = :review_state", "#updated_at = :updated_at"]
+        update_expression = "SET " + ", ".join(set_clauses)
+        if verification_reason is not None:
+            values[":verification_reason"] = verification_reason_to_item(verification_reason)
+            update_expression += ", #verification_reason = :verification_reason"
+        else:
+            update_expression += " REMOVE #verification_reason"
+
+        try:
+            response = self._table.update_item(
+                Key={"pk": patient_pk(care_recipient_id), "sk": event_sk(event_id)},
+                UpdateExpression=update_expression,
+                ConditionExpression="attribute_exists(pk)",
+                ExpressionAttributeNames=names,
+                ExpressionAttributeValues=values,
+                ReturnValues="ALL_NEW",
+            )
+        except ClientError as e:
+            if e.response.get("Error", {}).get("Code") == "ConditionalCheckFailedException":
+                raise CareEventNotFoundError(
+                    f"No care event {event_id!r} for care_recipient_id {care_recipient_id!r}"
+                ) from e
+            raise
         return from_item(response["Attributes"])
 
     def get_timeline(self, care_recipient_id: str, limit: int = 50) -> list[CareEventRecord]:

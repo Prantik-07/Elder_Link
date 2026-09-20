@@ -16,6 +16,8 @@ from __future__ import annotations
 import re
 import threading
 
+from botocore.exceptions import ClientError
+
 _SIMPLE_CLAUSE_RE = re.compile(r"^(#\w+) = (:\w+)$")
 _IF_NOT_EXISTS_RE = re.compile(r"^(#\w+) = if_not_exists\((#\w+), (:\w+)\)$")
 
@@ -52,23 +54,48 @@ class FakeCareEventsTable:
         self.update_item_calls = 0
         self._lock = threading.Lock()
 
-    def update_item(self, Key, UpdateExpression, ExpressionAttributeNames, ExpressionAttributeValues, ReturnValues="NONE"):
+    def update_item(
+        self,
+        Key,
+        UpdateExpression,
+        ExpressionAttributeNames,
+        ExpressionAttributeValues,
+        ReturnValues="NONE",
+        ConditionExpression=None,
+    ):
         with self._lock:
             self.update_item_calls += 1
             key = (Key["pk"], Key["sk"])
-            existing = self.items.get(key, {})
-            new_item = dict(existing)
+            existing = self.items.get(key)
+
+            if ConditionExpression == "attribute_exists(pk)" and existing is None:
+                raise ClientError(
+                    {
+                        "Error": {
+                            "Code": "ConditionalCheckFailedException",
+                            "Message": "The conditional request failed",
+                        }
+                    },
+                    "UpdateItem",
+                )
+
+            new_item = dict(existing) if existing else {}
             new_item["pk"] = Key["pk"]
             new_item["sk"] = Key["sk"]
 
-            assert UpdateExpression.startswith("SET "), f"unsupported UpdateExpression: {UpdateExpression!r}"
-            clauses = _split_top_level_clauses(UpdateExpression[len("SET "):])
+            set_expression = UpdateExpression
+            remove_expression = None
+            if " REMOVE " in UpdateExpression:
+                set_expression, remove_expression = UpdateExpression.split(" REMOVE ", 1)
+
+            assert set_expression.startswith("SET "), f"unsupported UpdateExpression: {UpdateExpression!r}"
+            clauses = _split_top_level_clauses(set_expression[len("SET "):])
             for clause in clauses:
                 m = _IF_NOT_EXISTS_RE.match(clause)
                 if m:
                     name_ph, existing_name_ph, value_ph = m.groups()
                     attr = ExpressionAttributeNames[name_ph]
-                    if attr in existing:
+                    if existing and attr in existing:
                         new_item[attr] = existing[attr]
                     else:
                         new_item[attr] = ExpressionAttributeValues[value_ph]
@@ -82,6 +109,11 @@ class FakeCareEventsTable:
                     continue
 
                 raise AssertionError(f"FakeCareEventsTable cannot interpret clause: {clause!r}")
+
+            if remove_expression:
+                for name_ph in [c.strip() for c in remove_expression.split(",")]:
+                    attr = ExpressionAttributeNames[name_ph]
+                    new_item.pop(attr, None)
 
             self.items[key] = new_item
             return {"Attributes": dict(new_item)}
