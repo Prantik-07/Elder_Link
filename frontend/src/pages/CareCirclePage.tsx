@@ -1,36 +1,46 @@
 import { useState, type FormEvent } from "react";
-import { Phone, Plus } from "lucide-react";
-import { CAREGIVERS, type Caregiver } from "../data/caregivers";
+import { Mail, Phone, Plus } from "lucide-react";
+import type { Caregiver } from "../data/caregivers";
 import { CaregiverAvatar } from "../components/CaregiverAvatar";
 import { Modal } from "../components/Modal";
+import { addMember, setMemberEmail, useCareCircle } from "../lib/careCircle";
+import { usePatients } from "../state/PatientsContext";
 
 export function CareCirclePage() {
-  const [members, setMembers] = useState<Caregiver[]>(CAREGIVERS);
+  const patientName = usePatients().activePatient?.name ?? "them";
+  const members = useCareCircle();
   const [addOpen, setAddOpen] = useState(false);
   const [name, setName] = useState("");
   const [role, setRole] = useState("Caregiver");
+  const [email, setEmail] = useState("");
+  const [editing, setEditing] = useState<Caregiver | null>(null);
+  const [editEmail, setEditEmail] = useState("");
 
   const closeAdd = () => {
     setAddOpen(false);
     setName("");
     setRole("Caregiver");
+    setEmail("");
   };
 
-  const addMember = (e: FormEvent) => {
+  const addNewMember = (e: FormEvent) => {
     e.preventDefault();
     const trimmed = name.trim();
     if (!trimmed) return;
-    setMembers((prev) => [
-      ...prev,
-      {
-        id: `${trimmed.toLowerCase().replace(/\s+/g, "-")}-${prev.length}`,
-        name: trimmed,
-        role: role.trim() || "Caregiver",
-        initials: trimmed.slice(0, 1).toUpperCase(),
-        color: "var(--color-ink-muted)",
-      },
-    ]);
+    addMember({
+      name: trimmed,
+      role: role.trim() || "Caregiver",
+      initials: trimmed.slice(0, 1).toUpperCase(),
+      color: "var(--color-ink-muted)",
+      email: email.trim() || undefined,
+    });
     closeAdd();
+  };
+
+  const saveEmail = (e: FormEvent) => {
+    e.preventDefault();
+    if (editing) setMemberEmail(editing.id, editEmail.trim());
+    setEditing(null);
   };
 
   return (
@@ -39,7 +49,7 @@ export function CareCirclePage() {
         <div className="min-w-0 flex-1">
           <h1 className="font-display text-[28px] text-[var(--color-ink)]">Care Circle</h1>
           <p className="mt-1.5 max-w-md text-[14px] leading-relaxed text-[var(--color-ink-soft)]">
-            Everyone helping look after Dad, and how to reach them. Coordinated care works best when the
+            Everyone helping look after {patientName}, and how to reach them. Coordinated care works best when the
             whole circle stays in the loop.
           </p>
         </div>
@@ -61,6 +71,17 @@ export function CareCirclePage() {
             <div className="min-w-0 flex-1">
               <p className="text-[14.5px] font-medium text-[var(--color-ink)]">{c.name}</p>
               <p className="text-[12.5px] text-[var(--color-ink-muted)]">{c.role}</p>
+              <button
+                type="button"
+                onClick={() => {
+                  setEditing(c);
+                  setEditEmail(c.email ?? "");
+                }}
+                className="mt-0.5 flex max-w-full items-center gap-1 text-[12.5px] text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]"
+              >
+                <Mail size={12} className="shrink-0" aria-hidden="true" />
+                <span className="truncate">{c.email ?? "Add email for alerts"}</span>
+              </button>
             </div>
             <button
               type="button"
@@ -82,7 +103,7 @@ export function CareCirclePage() {
         <div>
           <p className="font-display text-[18px] text-[var(--color-ink)]">You&rsquo;re not alone</p>
           <p className="mt-1 max-w-sm text-[13.5px] leading-relaxed text-[var(--color-ink-soft)]">
-            Caregiving is easier with a circle around you. Add anyone who helps with Dad&rsquo;s care so
+            Caregiving is easier with a circle around you. Add anyone who helps with {patientName}&rsquo;s care so
             they can see updates and pitch in on handoffs.
           </p>
         </div>
@@ -99,7 +120,7 @@ export function CareCirclePage() {
 
       {addOpen && (
         <Modal onClose={closeAdd} titleId="add-member-title">
-          <form onSubmit={addMember}>
+          <form onSubmit={addNewMember}>
             <h2 id="add-member-title" className="font-display text-[20px] text-[var(--color-ink)]">
               Add to Care Circle
             </h2>
@@ -110,6 +131,7 @@ export function CareCirclePage() {
                 onChange={(e) => setName(e.target.value)}
                 required
                 autoFocus
+                autoComplete="off"
                 className="mt-1.5 w-full rounded-lg border bg-[var(--color-paper)] px-3 py-2 text-[14px] font-normal"
                 style={{ borderColor: "var(--color-line)" }}
               />
@@ -119,6 +141,19 @@ export function CareCirclePage() {
               <input
                 value={role}
                 onChange={(e) => setRole(e.target.value)}
+                autoComplete="off"
+                className="mt-1.5 w-full rounded-lg border bg-[var(--color-paper)] px-3 py-2 text-[14px] font-normal"
+                style={{ borderColor: "var(--color-line)" }}
+              />
+            </label>
+            <label className="mt-3 block text-[13px] font-medium text-[var(--color-ink)]">
+              Email (optional)
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                autoComplete="off"
+                placeholder="Used to alert them when an update is flagged"
                 className="mt-1.5 w-full rounded-lg border bg-[var(--color-paper)] px-3 py-2 text-[14px] font-normal"
                 style={{ borderColor: "var(--color-line)" }}
               />
@@ -134,6 +169,45 @@ export function CareCirclePage() {
               <button
                 type="button"
                 onClick={closeAdd}
+                className="w-full rounded-full border px-5 py-3 text-[13.5px] font-semibold text-[var(--color-ink-soft)] sm:w-auto sm:py-2.5"
+                style={{ borderColor: "var(--color-line)" }}
+              >
+                Cancel
+              </button>
+            </div>
+          </form>
+        </Modal>
+      )}
+      {editing && (
+        <Modal onClose={() => setEditing(null)} titleId="edit-email-title">
+          <form onSubmit={saveEmail}>
+            <h2 id="edit-email-title" className="font-display text-[20px] text-[var(--color-ink)]">
+              Email for {editing.name}
+            </h2>
+            <p className="mt-1.5 text-[13.5px] text-[var(--color-ink-soft)]">
+              {editing.name} is emailed when someone else flags an update for review. Leave blank to turn alerts off.
+            </p>
+            <input
+              type="email"
+              value={editEmail}
+              onChange={(e) => setEditEmail(e.target.value)}
+              autoFocus
+              autoComplete="off"
+              aria-label="Email"
+              className="mt-4 w-full rounded-lg border bg-[var(--color-paper)] px-3 py-2 text-[14px]"
+              style={{ borderColor: "var(--color-line)" }}
+            />
+            <div className="mt-6 flex flex-col gap-2.5 sm:flex-row">
+              <button
+                type="submit"
+                className="w-full rounded-full px-5 py-3 text-[13.5px] font-semibold text-[var(--color-paper)] sm:w-auto sm:py-2.5"
+                style={{ backgroundColor: "var(--color-teal)" }}
+              >
+                Save
+              </button>
+              <button
+                type="button"
+                onClick={() => setEditing(null)}
                 className="w-full rounded-full border px-5 py-3 text-[13.5px] font-semibold text-[var(--color-ink-soft)] sm:w-auto sm:py-2.5"
                 style={{ borderColor: "var(--color-line)" }}
               >

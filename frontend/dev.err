@@ -1,0 +1,91 @@
+5:05:37 pm [vite] (client) [console.warn] No routes matched location "/patients" 
+5:05:37 pm [vite] (client) [console.warn] No routes matched location "/patients" 
+5:05:38 pm [vite] (client) [console.warn] No routes matched location "/patients" 
+5:05:38 pm [vite] (client) [console.warn] No routes matched location "/patients" 
+5:05:41 pm [vite] (client) [console.warn] No routes matched location "/patients" 
+5:05:41 pm [vite] (client) [console.warn] No routes matched location "/patients" 
+5:10:06 pm [vite] (client) [console.warn] No routes matched location "/patients" 
+5:10:06 pm [vite] (client) [console.warn] No routes matched location "/patients" 
+5:10:09 pm [vite] (client) [console.warn] No routes matched location "/patients" 
+5:10:09 pm [vite] (client) [console.warn] No routes matched location "/patients" 
+5:10:14 pm [vite] (client) [console.warn] No routes matched location "/patients" 
+5:10:14 pm [vite] (client) [console.warn] No routes matched location "/patients" 
+5:10:17 pm [vite] (client) [console.warn] No routes matched location "/patients" 
+5:10:17 pm [vite] (client) [console.warn] No routes matched location "/patients" 
+5:10:21 pm [vite] (client) [console.warn] No routes matched location "/patients" 
+5:10:21 pm [vite] (client) [console.warn] No routes matched location "/patients" 
+5:10:23 pm [vite] (client) [console.warn] No routes matched location "/patients" 
+5:10:23 pm [vite] (client) [console.warn] No routes matched location "/patients" 
+5:16:01 pm [vite] (client) [console.warn] No routes matched location "/patients" 
+5:16:01 pm [vite] (client) [console.warn] No routes matched location "/patients" 
+5:16:03 pm [vite] (client) [console.warn] No routes matched location "/patients" 
+5:16:03 pm [vite] (client) [console.warn] No routes matched location "/patients" 
+5:16:50 pm [vite] (client) [Unhandled error] Error: useCareEvents must be used within CareEventsProvider
+ > useCareEvents src/state/CareEventsContext.tsx:172:18
+    170 |  export function useCareEvents(): CareEventsContextValue {
+    171 |    const ctx = useContext(CareEventsContext);
+    172 |    if (!ctx) throw new Error("useCareEvents must be used within CareEventsProvider");
+        |                    ^
+    173 |    return ctx;
+    174 |  }
+ > ClearSelectionOnNavigate src/App.tsx:17:26
+ > Object.react_stack_bottom_frame node_modules/react-dom/cjs/react-dom-client.development.js:28571:19
+ > renderWithHooks node_modules/react-dom/cjs/react-dom-client.development.js:8030:21
+ > updateFunctionComponent node_modules/react-dom/cjs/react-dom-client.development.js:10569:18
+ > beginWork node_modules/react-dom/cjs/react-dom-client.development.js:12205:17
+ > runWithFiberInDEV node_modules/react-dom/cjs/react-dom-client.development.js:1045:29
+ > performUnitOfWork node_modules/react-dom/cjs/react-dom-client.development.js:19176:21
+ > workLoopSync node_modules/react-dom/cjs/react-dom-client.development.js:19004:40
+ > renderRootSync node_modules/react-dom/cjs/react-dom-client.development.js:18985:10
+
+5:16:50 pm [vite] (client) [console.warn] An error occurred in the <ClearSelectionOnNavigate> component.
+
+Consider adding an error boundary to your tree to customize error handling behavior.
+Visit https://react.dev/link/error-boundaries to learn more about error boundaries.
+
+5:35:30 pm [vite] (client) [Unhandled error] ReferenceError: PEN_PATH is not defined
+ > SplashScreen src/components/SplashScreen.tsx:46:21
+    44 |                <mask id="splash-pen-mask" maskUnits="userSpaceOnUse" x={0} y={0} width={520} height={150}>
+    45 |                  <motion.path
+    46 |                    d={PEN_PATH}
+       |                       ^
+    47 |                    fill="none"
+    48 |                    stroke="#fff"
+ > Object.react_stack_bottom_frame node_modules/react-dom/cjs/react-dom-client.development.js:28571:19
+ > renderWithHooks node_modules/react-dom/cjs/react-dom-client.development.js:8030:21
+ > updateFunctionComponent node_modules/react-dom/cjs/react-dom-client.development.js:10569:18
+ > beginWork node_modules/react-dom/cjs/react-dom-client.development.js:12205:17
+ > runWithFiberInDEV node_modules/react-dom/cjs/react-dom-client.development.js:1045:29
+ > performUnitOfWork node_modules/react-dom/cjs/react-dom-client.development.js:19176:21
+ > workLoopSync node_modules/react-dom/cjs/react-dom-client.development.js:19004:40
+ > renderRootSync node_modules/react-dom/cjs/react-dom-client.development.js:18985:10
+ > performWorkOnRoot node_modules/react-dom/cjs/react-dom-client.development.js:18094:34
+
+5:35:30 pm [vite] (client) [console.warn] An error occurred in the <SplashScreen> component.
+
+Consider adding an error boundary to your tree to customize error handling behavior.
+Visit https://react.dev/link/error-boundaries to learn more about error boundaries.
+
+5:35:32 pm [vite] (client) [Unhandled error] ReferenceError: PEN_PATH is not defined
+ > SplashScreen src/components/SplashScreen.tsx:46:21
+    44 |                <mask id="splash-pen-mask" maskUnits="userSpaceOnUse" x={0} y={0} width={520} height={150}>
+    45 |                  <motion.path
+    46 |                    d={PEN_PATH}
+       |                       ^
+    47 |                    fill="none"
+    48 |                    stroke="#fff"
+ > Object.react_stack_bottom_frame node_modules/react-dom/cjs/react-dom-client.development.js:28571:19
+ > renderWithHooks node_modules/react-dom/cjs/react-dom-client.development.js:8030:21
+ > updateFunctionComponent node_modules/react-dom/cjs/react-dom-client.development.js:10569:18
+ > beginWork node_modules/react-dom/cjs/react-dom-client.development.js:12205:17
+ > runWithFiberInDEV node_modules/react-dom/cjs/react-dom-client.development.js:1045:29
+ > performUnitOfWork node_modules/react-dom/cjs/react-dom-client.development.js:19176:21
+ > workLoopSync node_modules/react-dom/cjs/react-dom-client.development.js:19004:40
+ > renderRootSync node_modules/react-dom/cjs/react-dom-client.development.js:18985:10
+ > performWorkOnRoot node_modules/react-dom/cjs/react-dom-client.development.js:18094:34
+
+5:35:32 pm [vite] (client) [console.warn] An error occurred in the <SplashScreen> component.
+
+Consider adding an error boundary to your tree to customize error handling behavior.
+Visit https://react.dev/link/error-boundaries to learn more about error boundaries.
+

@@ -1,26 +1,40 @@
-import { useEffect } from "react";
-import { Route, Routes, useLocation } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { AnimatePresence } from "framer-motion";
+import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { Header } from "./components/Header";
 import { BottomNav } from "./components/BottomNav";
 import { CarePage } from "./pages/CarePage";
 import { TimelinePage } from "./pages/TimelinePage";
 import { HandoffPage } from "./pages/HandoffPage";
 import { CareCirclePage } from "./pages/CareCirclePage";
+import { SplashScreen } from "./components/SplashScreen";
 import { CareEventsProvider, useCareEvents } from "./state/CareEventsContext";
+import { PatientsProvider, usePatients } from "./state/PatientsContext";
 
 /** Selection is shared state, so drop it on navigation instead of opening the panel on the next page. */
 function ClearSelectionOnNavigate() {
   const { pathname } = useLocation();
   const { selectEvent } = useCareEvents();
+  const patientId = usePatients().activePatient?.id;
   useEffect(() => {
     selectEvent(null);
-  }, [pathname, selectEvent]);
+  }, [pathname, patientId, selectEvent]);
   return null;
 }
 
+const SPLASH_MS = 3800;
+
 export default function App() {
+  const [showSplash, setShowSplash] = useState(true);
+  useEffect(() => {
+    const t = setTimeout(() => setShowSplash(false), SPLASH_MS);
+    return () => clearTimeout(t);
+  }, []);
+
   return (
+    <PatientsProvider>
     <CareEventsProvider>
+      <AnimatePresence>{showSplash && <SplashScreen />}</AnimatePresence>
       <ClearSelectionOnNavigate />
       <div className="min-h-screen bg-[var(--color-ivory)]">
         <a
@@ -38,10 +52,13 @@ export default function App() {
             <Route path="/timeline" element={<TimelinePage />} />
             <Route path="/handoff" element={<HandoffPage />} />
             <Route path="/care-circle" element={<CareCirclePage />} />
+            {/* Unknown or removed URLs (e.g. the old /patients) land on Home instead of a blank page. */}
+            <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </main>
         <BottomNav />
       </div>
     </CareEventsProvider>
+    </PatientsProvider>
   );
 }

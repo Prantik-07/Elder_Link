@@ -20,6 +20,8 @@ export interface CareEventEvidence {
 
 export interface CareEvent {
   id: string;
+  /** Which patient this belongs to; absent means the default patient. */
+  patientId?: string;
   type: CareEventType;
   /**
    * Display label override for the category chip. Most event types render

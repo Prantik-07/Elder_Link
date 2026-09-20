@@ -4,6 +4,8 @@ import type { CareEvent, CareEventStatus } from "../data/types";
 import { CATEGORY_META } from "../lib/categoryMeta";
 import { formatTimestamp } from "../lib/format";
 import { addNote, removeNote, useNotes } from "../lib/notes";
+import { notifyCircleOfFlag, type FlagNotifyOutcome } from "../lib/flagNotify";
+import { usePatients } from "../state/PatientsContext";
 import { StatusBadge } from "./StatusBadge";
 import { AudioEvidencePlayer } from "./AudioEvidencePlayer";
 
@@ -28,6 +30,14 @@ export function EvidencePanel({
   const label = event.categoryLabel ?? meta.label;
   const reason = event.verificationReason ?? REASON_COPY[event.status];
   const notes = useNotes(event.id);
+  const patientName = usePatients().activePatient?.name ?? "the patient";
+  const [flagOutcome, setFlagOutcome] = useState<FlagNotifyOutcome | "sending" | null>(null);
+
+  const flagForReview = async () => {
+    onSetStatus("needs_verification");
+    setFlagOutcome("sending");
+    setFlagOutcome(await notifyCircleOfFlag(event, patientName));
+  };
   const [noteOpen, setNoteOpen] = useState(false);
   const [draft, setDraft] = useState("");
 
@@ -219,8 +229,9 @@ export function EvidencePanel({
         </button>
         <button
           type="button"
-          onClick={() => onSetStatus("needs_verification")}
-          className="w-full rounded-full border px-4 py-3 text-[14px] font-semibold text-[var(--color-ink-soft)] transition-colors hover:text-[var(--color-ink)] sm:w-auto sm:py-2 sm:text-[13px]"
+          onClick={flagForReview}
+          disabled={flagOutcome === "sending"}
+          className="w-full rounded-full border px-4 py-3 text-[14px] font-semibold text-[var(--color-ink-soft)] transition-colors hover:text-[var(--color-ink)] disabled:opacity-60 sm:w-auto sm:py-2 sm:text-[13px]"
           style={{ borderColor: "var(--color-line)" }}
         >
           Flag for review
@@ -235,6 +246,18 @@ export function EvidencePanel({
           Add Note
         </button>
       </div>
+      {flagOutcome && (
+        <p
+          role="status"
+          className="border-t px-6 py-3 text-[13px] leading-snug"
+          style={{
+            borderColor: "var(--color-line)",
+            color: flagOutcome !== "sending" && flagOutcome.tone === "error" ? "var(--color-concern)" : "var(--color-ink-soft)",
+          }}
+        >
+          {flagOutcome === "sending" ? "Flagging and notifying the Care Circle..." : flagOutcome.message}
+        </p>
+      )}
     </div>
   );
 }

@@ -10,6 +10,7 @@ import {
 import { fetchCareEventTimeline, USE_MOCK_DATA } from "../data/api";
 import { mockCareEvents } from "../data/mockEvents";
 import type { CareEvent, CareEventStatus } from "../data/types";
+import { DEFAULT_PATIENT_ID, usePatients } from "./PatientsContext";
 
 export type CareFilter =
   | "all"
@@ -42,7 +43,14 @@ interface CareEventsContextValue {
 const CareEventsContext = createContext<CareEventsContextValue | null>(null);
 
 export function CareEventsProvider({ children }: { children: ReactNode }) {
-  const [events, setEvents] = useState<CareEvent[]>(USE_MOCK_DATA ? mockCareEvents : []);
+  const { activePatient } = usePatients();
+  const activePatientId = activePatient?.id ?? DEFAULT_PATIENT_ID;
+  const [allEvents, setEvents] = useState<CareEvent[]>(USE_MOCK_DATA ? mockCareEvents : []);
+  // Every page reads `events`, so scoping here scopes the whole app to the chosen patient.
+  const events = useMemo(
+    () => allEvents.filter((e) => (e.patientId ?? DEFAULT_PATIENT_ID) === activePatientId),
+    [allEvents, activePatientId],
+  );
   const [isLoading, setIsLoading] = useState(!USE_MOCK_DATA);
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<CareFilter>("all");
@@ -90,9 +98,9 @@ export function CareEventsProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const addEvent = useCallback((event: CareEvent) => {
-    setEvents((prev) => [event, ...prev]);
+    setEvents((prev) => [{ ...event, patientId: event.patientId ?? activePatientId }, ...prev]);
     setSelectedId(event.id);
-  }, []);
+  }, [activePatientId]);
 
   const selectEvent = useCallback((id: string | null) => setSelectedId(id), []);
   const toggleEvent = useCallback(

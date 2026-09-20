@@ -1,7 +1,10 @@
 import { useState } from "react";
 import { NavLink } from "react-router-dom";
-import { ChevronDown, Clock, Home, Menu, Search, UserRound, Users, X } from "lucide-react";
+import { ChevronDown, Clock, Home, Menu, Plus, Search, UserRound, Users, X } from "lucide-react";
 import { useCareEvents } from "../state/CareEventsContext";
+import { patientSubtitle, usePatients } from "../state/PatientsContext";
+import { PatientAvatar } from "./PatientAvatar";
+import { AddPatientModal } from "./AddPatientModal";
 
 const NAV_ITEMS = [
   { to: "/", label: "Home", end: true, icon: Home },
@@ -13,6 +16,8 @@ const NAV_ITEMS = [
 export function Header() {
   const [searchOpen, setSearchOpen] = useState(false);
   const [patientMenuOpen, setPatientMenuOpen] = useState(false);
+  const [addPatientOpen, setAddPatientOpen] = useState(false);
+  const { patients, activePatient, selectPatient } = usePatients();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const { search, setSearch } = useCareEvents();
 
@@ -101,38 +106,78 @@ export function Header() {
               aria-expanded={patientMenuOpen}
               className="flex items-center gap-2 rounded-full py-1 pr-2 pl-1 transition-colors hover:bg-[var(--color-ivory-soft)]"
             >
-              <img
-                src="/patient-avatar.svg"
-                alt=""
-                aria-hidden="true"
-                className="h-9 w-9 shrink-0 rounded-full ring-2 ring-[var(--color-paper)] ring-offset-1 ring-offset-[var(--color-line-soft)]"
-              />
+              {activePatient ? (
+                <PatientAvatar patient={activePatient} size={36} />
+              ) : (
+                <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[var(--color-ivory-soft)] text-[var(--color-ink-muted)]">
+                  <Users size={16} aria-hidden="true" />
+                </span>
+              )}
               <span className="hidden text-left leading-tight lg:block">
-                <span className="block text-[13.5px] font-medium whitespace-nowrap text-[var(--color-ink)]">Dad</span>
+                <span className="block text-[13.5px] font-medium whitespace-nowrap text-[var(--color-ink)]">
+                  {activePatient?.name ?? "Choose patient"}
+                </span>
                 <span className="block text-[12px] whitespace-nowrap text-[var(--color-ink-muted)]">
-                  Age 78 &middot; Living at home
+                  {activePatient ? patientSubtitle(activePatient) : "Who are you caring for?"}
                 </span>
               </span>
               <ChevronDown size={14} className="text-[var(--color-ink-muted)]" aria-hidden="true" />
             </button>
 
             {patientMenuOpen && (
-              <ul
-                role="listbox"
-                className="absolute top-full right-0 mt-2 w-48 overflow-hidden rounded-xl border bg-[var(--color-paper)] py-1 shadow-[var(--shadow-panel)]"
+              <div
+                className="absolute top-full right-0 z-40 mt-2 w-64 overflow-hidden rounded-xl border bg-[var(--color-paper)] py-1 shadow-[var(--shadow-panel)]"
                 style={{ borderColor: "var(--color-line)" }}
               >
-                <li role="option" aria-selected="true">
+                <p className="px-3.5 pt-2 pb-1 text-[12px] font-semibold tracking-wide text-[var(--color-ink-muted)] uppercase">
+                  Switch patient
+                </p>
+                <ul role="listbox" aria-label="Patients">
+                  {patients.map((p) => {
+                    const active = activePatient?.id === p.id;
+                    return (
+                      <li key={p.id} role="option" aria-selected={active}>
+                        <button
+                          type="button"
+                          className="flex w-full items-center gap-2.5 px-3.5 py-2 text-left hover:bg-[var(--color-ivory-soft)]"
+                          onClick={() => {
+                            selectPatient(p.id);
+                            setPatientMenuOpen(false);
+                          }}
+                        >
+                          <PatientAvatar patient={p} size={30} />
+                          <span className="min-w-0 flex-1">
+                            <span className="block truncate text-[13.5px] text-[var(--color-ink)]">{p.name}</span>
+                            <span className="block truncate text-[12px] text-[var(--color-ink-muted)]">
+                              {patientSubtitle(p)}
+                            </span>
+                          </span>
+                          {active && <span style={{ color: "var(--color-teal)" }}>&#10003;</span>}
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+                <div className="mt-1 border-t pt-1" style={{ borderColor: "var(--color-line)" }}>
                   <button
                     type="button"
-                    className="flex w-full items-center justify-between px-3.5 py-2 text-[13.5px] text-[var(--color-ink)] hover:bg-[var(--color-ivory-soft)]"
-                    onClick={() => setPatientMenuOpen(false)}
+                    className="flex w-full items-center gap-2 px-3.5 py-2 text-[13.5px] text-[var(--color-ink)] hover:bg-[var(--color-ivory-soft)]"
+                    onClick={() => {
+                      setPatientMenuOpen(false);
+                      setAddPatientOpen(true);
+                    }}
                   >
-                    Dad
-                    <span style={{ color: "var(--color-teal)" }}>&#10003;</span>
+                    <Plus size={15} aria-hidden="true" />
+                    Add patient
                   </button>
-                </li>
-              </ul>
+                </div>
+              </div>
+            )}
+            {addPatientOpen && (
+              <AddPatientModal
+                onClose={() => setAddPatientOpen(false)}
+                onAdded={(p) => selectPatient(p.id)}
+              />
             )}
           </div>
 
