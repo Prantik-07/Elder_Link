@@ -121,7 +121,7 @@ export function AudioEvidencePlayer({
       <button
         type="button"
         onClick={cycleSpeed}
-        className="shrink-0 rounded-full border px-2.5 py-2 text-[11px] font-semibold tabular-nums text-[var(--color-ink-soft)] lg:py-1"
+        className="shrink-0 rounded-full border px-2.5 py-2 text-[12px] font-semibold tabular-nums text-[var(--color-ink-soft)] lg:py-1"
         style={{ borderColor: "var(--color-line)" }}
         aria-label="Playback speed"
       >

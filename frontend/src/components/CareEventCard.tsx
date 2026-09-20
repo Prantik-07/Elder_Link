@@ -42,7 +42,7 @@ export function CareEventCard({
         }
       >
         <span
-          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full"
+          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl"
           style={{ backgroundColor: meta.iconBg, color: meta.iconColor }}
           aria-hidden="true"
         >
@@ -51,7 +51,7 @@ export function CareEventCard({
 
         <span className="min-w-0 flex-1">
           <span
-            className="block text-[11px] font-semibold tracking-wide uppercase"
+            className="block text-[12px] font-semibold tracking-wide uppercase"
             style={{ color: isFlagged ? "var(--color-amber)" : meta.iconColor }}
           >
             {label}

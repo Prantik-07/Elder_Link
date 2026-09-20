@@ -32,14 +32,14 @@ export function HandoffEventRow({
         }}
       >
         <span
-          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full"
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px]"
           style={{ backgroundColor: meta.iconBg, color: meta.iconColor }}
           aria-hidden="true"
         >
           <Icon size={16} strokeWidth={2} />
         </span>
         <span className="min-w-0 flex-1">
-          <span className="block text-[11px] font-semibold tracking-wide uppercase" style={{ color: meta.iconColor }}>
+          <span className="block text-[12px] font-semibold tracking-wide uppercase" style={{ color: meta.iconColor }}>
             {label}
           </span>
           <span className="font-display mt-0.5 block text-[14.5px] leading-snug text-[var(--color-ink)]">

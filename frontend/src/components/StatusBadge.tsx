@@ -37,7 +37,7 @@ export function StatusBadge({
 }) {
   const meta = STATUS_META[status];
   const Icon = meta.icon;
-  const padding = size === "sm" ? "px-2 py-0.5 text-[11px]" : "px-2.5 py-1 text-xs";
+  const padding = size === "sm" ? "px-2 py-0.5 text-[12px]" : "px-2.5 py-1 text-xs";
 
   return (
     <span

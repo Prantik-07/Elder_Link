@@ -28,7 +28,7 @@ export function Header() {
             <span className="font-display text-[20px] tracking-tight text-[var(--color-ink)]">
               ElderLink
             </span>
-            <span className="mt-1 hidden text-[10.5px] tracking-wide text-[var(--color-ink-muted)] sm:block">
+            <span className="mt-1 hidden text-[12px] tracking-wide text-[var(--color-ink-muted)] sm:block">
               Together in every chapter
             </span>
           </div>
@@ -109,7 +109,7 @@ export function Header() {
               />
               <span className="hidden text-left leading-tight lg:block">
                 <span className="block text-[13.5px] font-medium whitespace-nowrap text-[var(--color-ink)]">Dad</span>
-                <span className="block text-[11px] whitespace-nowrap text-[var(--color-ink-muted)]">
+                <span className="block text-[12px] whitespace-nowrap text-[var(--color-ink-muted)]">
                   Age 78 &middot; Living at home
                 </span>
               </span>
@@ -146,7 +146,7 @@ export function Header() {
             </span>
             <span className="leading-tight whitespace-nowrap">
               <span className="block text-[13px] font-medium text-[var(--color-ink)]">Hi, Shivaansh</span>
-              <span className="block text-[10.5px] text-[var(--color-ink-muted)]">Caregiver</span>
+              <span className="block text-[12px] text-[var(--color-ink-muted)]">Caregiver</span>
             </span>
           </div>
 
@@ -198,7 +198,7 @@ export function Header() {
                   </span>
                   <span className="leading-tight">
                     <span className="block text-[13px] font-medium text-[var(--color-ink)]">Hi, Shivaansh</span>
-                    <span className="block text-[11px] text-[var(--color-ink-muted)]">Caregiver</span>
+                    <span className="block text-[12px] text-[var(--color-ink-muted)]">Caregiver</span>
                   </span>
                 </div>
               </div>
