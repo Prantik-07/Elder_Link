@@ -33,17 +33,36 @@ def get_audio_bucket() -> str:
 
 
 def get_provider() -> "TranscriptionProvider":
-    from core.transcription import MockTranscriptionProvider, TranscriptionResult, VoxtralProvider
+    from core.transcription import (
+        DeepgramTranscriptionProvider,
+        GroqTranscriptionProvider,
+        MockTranscriptionProvider,
+        OpenAITranscriptionProvider,
+        TranscriptionResult,
+        VoxtralProvider,
+    )
 
     provider_type = os.getenv("TRANSCRIPTION_PROVIDER", "mock")
     if provider_type == "mock":
         return MockTranscriptionProvider()
     elif provider_type == "voxtral":
         return VoxtralProvider(model_id=BEDROCK_MODEL_ID, region=AWS_REGION)
+    elif provider_type == "deepgram":
+        # Explicit opt-in only; never a silent fallback target or source.
+        # Raises a ValueError subclass if DEEPGRAM_API_KEY is unset.
+        return DeepgramTranscriptionProvider()
+    elif provider_type == "openai":
+        # Explicit opt-in only; raises a ValueError subclass if
+        # OPENAI_API_KEY is unset. No silent fallback.
+        return OpenAITranscriptionProvider()
+    elif provider_type == "groq":
+        # Explicit opt-in only; raises a ValueError subclass if
+        # GROQ_API_KEY is unset. No silent fallback.
+        return GroqTranscriptionProvider()
     else:
         raise ValueError(
             f"Invalid TRANSCRIPTION_PROVIDER: '{provider_type}'. "
-            f"Allowed values: 'mock', 'voxtral'"
+            f"Allowed values: 'mock', 'voxtral', 'deepgram', 'openai', 'groq'"
         )
 
 
@@ -145,6 +164,12 @@ def lambda_handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
             "error": result.error,
         }
 
+        # Additive: only providers with real utterance timing (Deepgram) add
+        # "segments"; mock/voxtral output is byte-for-byte what it was.
+        segments = getattr(result, "segments", None)
+        if result.success and isinstance(segments, list) and segments:
+            transcript_data["segments"] = segments
+
         s3_client.put_object(
             Bucket=bucket,
             Key=transcript_key,
@@ -152,6 +177,8 @@ def lambda_handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
             ContentType="application/json",
         )
 
+        if not result.success:
+            print(f"Transcription FAILED via {result.provider}: {result.error}")
         print(f"Transcript written to s3://{bucket}/{transcript_key}")
         return {"statusCode": 200, "body": json.dumps(transcript_data)}
 

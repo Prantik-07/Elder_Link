@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Optional
+from typing import Any, Optional
 
 
 @dataclass
@@ -11,6 +11,9 @@ class TranscriptionResult:
     language: Optional[str] = None
     duration_seconds: Optional[float] = None
     error: Optional[str] = None
+    # Optional provider-native utterances: [{text, start_time, end_time}].
+    # None for providers (mock, voxtral) that only return flat text.
+    segments: Optional[list[dict[str, Any]]] = None
 
     @classmethod
     def success_result(

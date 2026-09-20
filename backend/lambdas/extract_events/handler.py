@@ -58,7 +58,7 @@ from typing import Any
 import boto3
 from botocore.exceptions import BotoCoreError, ClientError
 
-from backend.core.care_event import from_day1_transcript
+from backend.core.care_event import from_stored_transcript
 from backend.core.extraction import (
     EXTRACTION_SCHEMA_VERSION,
     BedrockExtractionProvider,
@@ -173,7 +173,7 @@ def lambda_handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
             print(f"Skipping transcript '{note_id}': status={status!r} (not completed)")
             return {"statusCode": 200, "body": f"Skipped: transcript status is {status!r}"}
 
-        document = from_day1_transcript(note_id, transcript_text)
+        document = from_stored_transcript(note_id, transcript_text, transcript_data.get("segments"))
 
         provider = get_extraction_provider()
         print(f"Using extraction provider: {provider.provider_name} ({provider.model_id})")
