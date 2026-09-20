@@ -1,8 +1,9 @@
 import { useState } from "react";
 import { NavLink } from "react-router-dom";
-import { ChevronDown, Clock, Home, Menu, Plus, Search, UserRound, Users, X } from "lucide-react";
+import { ChevronDown, Clock, Home, Menu, Plus, RefreshCw, Search, UserRound, Users, X } from "lucide-react";
 import { useCareEvents } from "../state/CareEventsContext";
 import { patientSubtitle, usePatients } from "../state/PatientsContext";
+import { USE_MOCK_DATA } from "../data/api";
 import { PatientAvatar } from "./PatientAvatar";
 import { AddPatientModal } from "./AddPatientModal";
 
@@ -19,14 +20,14 @@ export function Header() {
   const [addPatientOpen, setAddPatientOpen] = useState(false);
   const { patients, activePatient, selectPatient } = usePatients();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const { search, setSearch } = useCareEvents();
+  const { search, setSearch, refresh, isRefreshing } = useCareEvents();
 
   return (
     <header
       className="sticky top-0 z-30 border-b bg-[var(--color-ivory)]/90 backdrop-blur"
       style={{ borderColor: "var(--color-line)" }}
     >
-      <div className="mx-auto flex h-16 max-w-7xl items-center gap-4 px-4 sm:px-6 lg:gap-4 xl:gap-7">
+      <div className="mx-auto flex h-16 max-w-7xl items-center gap-4 px-4 sm:px-6 lg:gap-3 xl:gap-7">
         <div className="flex min-w-0 shrink-0 items-center gap-2">
           <img src="/assets/logo-mark.png" alt="" aria-hidden="true" className="h-8 w-auto shrink-0" />
           <div className="flex flex-col justify-center leading-none">
@@ -59,7 +60,24 @@ export function Header() {
           ))}
         </nav>
 
-        <div className="ml-auto flex min-w-0 items-center gap-2 sm:gap-3">
+        <div className="ml-auto flex min-w-0 items-center gap-2 sm:gap-2.5 xl:gap-3">
+          {/* Backed by the real DynamoDB-fed read API (not a background
+              poller - see CareEventsContext.refresh): lets a caregiver pull
+              in a voice note that finished processing after this page
+              first loaded, on demand rather than guessing when to reload. */}
+          {!USE_MOCK_DATA && (
+            <button
+              type="button"
+              onClick={refresh}
+              disabled={isRefreshing}
+              aria-label="Check for new updates"
+              title="Check for new updates"
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-[var(--color-ink-muted)] transition-colors hover:bg-[var(--color-ivory-soft)] hover:text-[var(--color-ink)] disabled:opacity-60"
+            >
+              <RefreshCw size={17} className={isRefreshing ? "animate-spin" : ""} aria-hidden="true" />
+            </button>
+          )}
+
           {searchOpen ? (
             <div className="flex items-center gap-1.5 rounded-full border bg-[var(--color-paper)] px-3 py-1.5" style={{ borderColor: "var(--color-line)" }}>
               <Search size={14} className="shrink-0 text-[var(--color-ink-muted)]" aria-hidden="true" />
@@ -181,17 +199,20 @@ export function Header() {
             )}
           </div>
 
-          <div className="hidden items-center gap-2 border-l pl-3 lg:flex" style={{ borderColor: "var(--color-line)" }}>
+          <div className="hidden items-center gap-1 border-l pl-1.5 lg:flex xl:gap-2 xl:pl-3" style={{ borderColor: "var(--color-line)" }}>
             <span
-              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[12px] font-semibold text-[var(--color-paper)]"
+              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold text-[var(--color-paper)] xl:h-8 xl:w-8 xl:text-[12px]"
               style={{ backgroundColor: "var(--color-teal)" }}
               aria-hidden="true"
             >
               SP
             </span>
             <span className="leading-tight whitespace-nowrap">
-              <span className="block text-[13px] font-medium text-[var(--color-ink)]">Hi, Shivaansh</span>
-              <span className="block text-[12px] text-[var(--color-ink-muted)]">Caregiver</span>
+              <span className="block text-[13px] font-medium text-[var(--color-ink)]">
+                <span className="xl:hidden">Shivaansh</span>
+                <span className="hidden xl:inline">Hi, Shivaansh</span>
+              </span>
+              <span className="hidden text-[12px] text-[var(--color-ink-muted)] xl:block">Caregiver</span>
             </span>
           </div>
 

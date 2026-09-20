@@ -1,4 +1,4 @@
-import type { CareEvent } from "./types";
+import type { CareEvent, CareEventStatus } from "./types";
 
 export const API_BASE_URL = import.meta.env.VITE_ELDERLINK_API_URL ?? "";
 export const CARE_RECIPIENT_ID = import.meta.env.VITE_ELDERLINK_CARE_RECIPIENT_ID ?? "demo-dad";
@@ -34,6 +34,40 @@ export async function fetchCareEventTimeline(
 
   const data: TimelineResponse = await response.json();
   return data.events;
+}
+
+/**
+ * Persists a caregiver's verification decision (Day 5) via
+ * PATCH /care-recipients/{id}/care-events/{eventId}. Only "verified" and
+ * "uncertain" are valid caregiver-initiated statuses - the backend maps
+ * "uncertain" to review_state=needs_verification with a fixed
+ * verification_reason (see update_care_event_status/handler.py); this is
+ * the same narrow contract the backend enforces, not an independent
+ * frontend rule that could drift from it. Throws on any non-2xx response
+ * or network failure - callers must treat that as "not persisted", never
+ * apply the change locally anyway (see CareEventsContext.setStatus).
+ */
+export async function updateCareEventStatus(
+  eventId: string,
+  status: Extract<CareEventStatus, "verified" | "uncertain">,
+  careRecipientId: string = CARE_RECIPIENT_ID,
+): Promise<CareEvent> {
+  if (!API_BASE_URL) {
+    throw new Error("VITE_ELDERLINK_API_URL is not configured - cannot save verification status.");
+  }
+
+  const url = `${API_BASE_URL.replace(/\/$/, "")}/care-recipients/${encodeURIComponent(careRecipientId)}/care-events/${encodeURIComponent(eventId)}`;
+  const response = await fetch(url, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ status }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to save verification status: ${response.status} ${response.statusText}`);
+  }
+
+  return response.json();
 }
 
 export interface AudioUploadUrlResponse {

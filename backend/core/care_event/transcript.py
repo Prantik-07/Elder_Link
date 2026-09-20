@@ -91,3 +91,36 @@ def from_day1_transcript(note_id: str, transcript_text: str) -> TranscriptDocume
         for i, s in enumerate(raw_sentences)
     ]
     return TranscriptDocument(transcript_id=note_id, full_text=text, segments=segments)
+
+
+def from_stored_transcript(
+    note_id: str, transcript_text: str, segments: Optional[list] = None
+) -> TranscriptDocument:
+    """Build the canonical document from a stored transcript JSON. When the
+    provider supplied real utterance segments (Deepgram), use them with their
+    real timings (null stays null); otherwise, or if they are malformed, fall
+    back to the Day 1 sentence-split adapter unchanged."""
+    if isinstance(segments, list) and segments:
+        try:
+            built = []
+            for i, s in enumerate(segments):
+                text = str(s["text"]).strip()
+                if not text:
+                    continue
+                built.append(
+                    TranscriptSegment(
+                        segment_id=stable_segment_id(note_id, len(built), text),
+                        text=text,
+                        start_time=s.get("start_time"),
+                        end_time=s.get("end_time"),
+                    )
+                )
+            if built:
+                return TranscriptDocument(
+                    transcript_id=note_id,
+                    full_text=transcript_text.strip(),
+                    segments=built,
+                )
+        except (KeyError, TypeError, AttributeError):
+            pass
+    return from_day1_transcript(note_id, transcript_text)

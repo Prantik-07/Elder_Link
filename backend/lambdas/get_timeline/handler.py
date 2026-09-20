@@ -79,5 +79,17 @@ def lambda_handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
     # with no persisted events yet) - not an error, and not distinguished
     # from "not found" since care_recipient_id has no separate existence
     # check (see Phase 7 report on care-recipient identity).
-    events = [care_event_to_dto(record) for record in records]
+    try:
+        events = [care_event_to_dto(record) for record in records]
+    except Exception as e:
+        # A DTO-mapping bug (e.g. a persisted event_type that
+        # _FRONTEND_TYPE doesn't yet know about) must still return CORS
+        # headers and a readable JSON error - without this catch, such a
+        # bug propagates as a raw, header-less Lambda crash that API
+        # Gateway turns into a browser-side CORS failure indistinguishable
+        # from the API being unreachable (see the audit finding this
+        # fixes).
+        print(f"Failed to map care events to frontend DTOs for care_recipient_id={care_recipient_id!r}: {e}")
+        return _response(500, {"error": "Server error while formatting timeline"})
+
     return _response(200, {"care_recipient_id": care_recipient_id, "events": events})

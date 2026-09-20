@@ -83,6 +83,7 @@ class TestValidGetTimeline:
             "summary",
             "whatHappened",
             "occurredAt",
+            "occurredAtPrecision",
             "reportedBy",
             "status",
             "evidence",
@@ -146,6 +147,28 @@ class TestRepositoryFailure:
         with patch.dict(os.environ, {}, clear=True):
             result = lambda_handler(_api_event({"care_recipient_id": "demo-dad"}), None)
         assert result["statusCode"] == 500
+
+
+class TestDtoMappingFailure:
+    """Regression test for the forensic audit's finding: an exception
+    raised while mapping a persisted record to the frontend DTO (e.g. a
+    persisted event_type _FRONTEND_TYPE doesn't recognize) must still
+    return the project's standard JSON error shape AND CORS headers,
+    never an uncaught, header-less Lambda crash that a browser turns into
+    an opaque CORS/network failure."""
+
+    def test_dto_mapping_exception_returns_500_with_error_body_and_cors_headers(self):
+        fake_table = FakeCareEventsTable()
+        repo = CareEventRepository(table=fake_table)
+        repo.put_event(_event("ce_1"), CareContext("demo-dad", "note-1"), "v1")
+
+        with patch("backend.lambdas.get_timeline.handler.care_event_to_dto", side_effect=KeyError("boom")):
+            result = _invoke_with_table(fake_table, {"care_recipient_id": "demo-dad"})
+
+        assert result["statusCode"] == 500
+        body = json.loads(result["body"])
+        assert "error" in body
+        assert result["headers"]["Access-Control-Allow-Origin"]
 
 
 class TestUsesCareTimelineIndex:

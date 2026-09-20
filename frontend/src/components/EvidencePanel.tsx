@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Calendar, Check, CircleHelp, MapPin, StickyNote, Trash2, User, X } from "lucide-react";
+import { Calendar, Check, CircleHelp, Loader2, MapPin, StickyNote, Trash2, User, X } from "lucide-react";
 import type { CareEvent, CareEventStatus } from "../data/types";
 import { CATEGORY_META } from "../lib/categoryMeta";
 import { formatTimestamp } from "../lib/format";
@@ -23,7 +23,7 @@ export function EvidencePanel({
 }: {
   event: CareEvent;
   onClose?: () => void;
-  onSetStatus: (status: CareEventStatus) => void;
+  onSetStatus: (status: CareEventStatus) => Promise<void>;
 }) {
   const meta = CATEGORY_META[event.type];
   const Icon = meta.icon;
@@ -33,11 +33,6 @@ export function EvidencePanel({
   const patientName = usePatients().activePatient?.name ?? "the patient";
   const [flagOutcome, setFlagOutcome] = useState<FlagNotifyOutcome | "sending" | null>(null);
 
-  const flagForReview = async () => {
-    onSetStatus("needs_verification");
-    setFlagOutcome("sending");
-    setFlagOutcome(await notifyCircleOfFlag(event, patientName));
-  };
   const [noteOpen, setNoteOpen] = useState(false);
   const [draft, setDraft] = useState("");
 
@@ -47,6 +42,37 @@ export function EvidencePanel({
     addNote(event.id, text);
     setDraft("");
     setNoteOpen(false);
+  };
+
+  const [pendingStatus, setPendingStatus] = useState<CareEventStatus | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
+
+  /** Resolves true only if the backend confirmed the write. */
+  const handleSetStatus = async (status: CareEventStatus): Promise<boolean> => {
+    setPendingStatus(status);
+    setSaveError(null);
+    try {
+      await onSetStatus(status);
+      return true;
+    } catch (err) {
+      // The write failed - the status shown above is still whatever the
+      // backend last confirmed, never the attempted value, so this error
+      // message is the only place the failure is visible. Never treat a
+      // rejected save as if it succeeded.
+      setSaveError(err instanceof Error ? err.message : "Couldn't save. Try again.");
+      return false;
+    } finally {
+      setPendingStatus(null);
+    }
+  };
+
+  // The backend only persists "verified" and "uncertain", so flagging keeps the
+  // event unresolved ("uncertain") and then alerts the rest of the Care Circle.
+  // Nobody is notified unless the save actually succeeded.
+  const flagForReview = async () => {
+    if (!(await handleSetStatus("uncertain"))) return;
+    setFlagOutcome("sending");
+    setFlagOutcome(await notifyCircleOfFlag(event, patientName));
   };
 
   return (
@@ -220,22 +246,35 @@ export function EvidencePanel({
       >
         <button
           type="button"
-          onClick={() => onSetStatus("verified")}
-          className="flex w-full items-center justify-center gap-1.5 rounded-full px-4 py-3 text-[14px] font-semibold text-[var(--color-paper)] transition-opacity hover:opacity-90 sm:w-auto sm:py-2 sm:text-[13px]"
+          onClick={() => handleSetStatus("verified")}
+          disabled={pendingStatus !== null}
+          className="flex w-full items-center justify-center gap-1.5 rounded-full px-4 py-3 text-[14px] font-semibold text-[var(--color-paper)] transition-opacity hover:opacity-90 disabled:opacity-60 sm:w-auto sm:py-2 sm:text-[13px]"
           style={{ backgroundColor: "var(--color-teal)" }}
         >
-          <Check size={14} aria-hidden="true" />
+          {pendingStatus === "verified" ? (
+            <Loader2 size={14} className="animate-spin" aria-hidden="true" />
+          ) : (
+            <Check size={14} aria-hidden="true" />
+          )}
           Mark as Verified
         </button>
         <button
           type="button"
           onClick={flagForReview}
-          disabled={flagOutcome === "sending"}
-          className="w-full rounded-full border px-4 py-3 text-[14px] font-semibold text-[var(--color-ink-soft)] transition-colors hover:text-[var(--color-ink)] disabled:opacity-60 sm:w-auto sm:py-2 sm:text-[13px]"
+          disabled={pendingStatus !== null || flagOutcome === "sending"}
+          className="flex w-full items-center justify-center gap-1.5 rounded-full border px-4 py-3 text-[14px] font-semibold text-[var(--color-ink-soft)] transition-colors hover:text-[var(--color-ink)] disabled:opacity-60 sm:w-auto sm:py-2 sm:text-[13px]"
           style={{ borderColor: "var(--color-line)" }}
         >
+          {(pendingStatus === "uncertain" || flagOutcome === "sending") && (
+            <Loader2 size={14} className="animate-spin" aria-hidden="true" />
+          )}
           Flag for review
         </button>
+        {saveError && (
+          <p className="w-full text-[12.5px] leading-snug text-[var(--color-concern)]" role="alert">
+            {saveError}
+          </p>
+        )}
         <button
           type="button"
           onClick={() => setNoteOpen(true)}

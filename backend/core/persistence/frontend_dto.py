@@ -70,18 +70,45 @@ def _occurred_at_iso(record: CareEventRecord) -> str:
     """The frontend's `occurredAt` is sorted and formatted as a real
     instant (see lib/format.ts, CareEventsContext's sort), so it must
     always be a valid ISO 8601 datetime - never a bare date, a relative
-    phrase, or "unknown". EXACT_TIMESTAMP is used as-is; DATE is widened to
-    midnight UTC on that date; RELATIVE/UNKNOWN (where the canonical model
-    genuinely doesn't know a real-world instant) falls back to this
-    record's own `created_at` - always a well-formed instant, assigned
-    once at first persistence - rather than fabricating a fake occurred_at.
+    phrase, or "unknown". EXACT_TIMESTAMP is used as-is.
+
+    DATE is widened to *noon* UTC on that date, not midnight UTC. Midnight
+    UTC shifts to the PREVIOUS calendar day once rendered in any timezone
+    west of UTC (most of the Americas), which misrepresents a known date
+    as a different date in the caregiver's own browser - exactly the
+    "DATE precision must not shift the user's calendar day" bug the
+    forensic audit found. Noon UTC keeps the same calendar date across the
+    entire practically-occurring timezone range (UTC-11 through UTC+12,
+    i.e. every real-world timezone) when rendered locally - it is still an
+    approximation of "some time on this date", never a claim that the
+    event happened at exactly noon, but it no longer corrupts the date
+    itself, which is the one thing DATE precision actually promises.
+
+    RELATIVE/UNKNOWN (where the canonical model genuinely doesn't know a
+    real-world instant) falls back to this record's own `created_at` -
+    always a well-formed instant, assigned once at first persistence -
+    rather than fabricating a fake occurred_at. See occurred_at_precision()
+    below: that fallback is now flagged in the DTO rather than left
+    indistinguishable from a real reported time.
     """
     occurred_at = record.event.occurred_at
     if occurred_at.precision == TemporalPrecision.EXACT_TIMESTAMP and occurred_at.timestamp:
         return occurred_at.timestamp
     if occurred_at.precision == TemporalPrecision.DATE and occurred_at.date:
-        return f"{occurred_at.date}T00:00:00Z"
+        return f"{occurred_at.date}T12:00:00Z"
     return record.created_at
+
+
+def _occurred_at_precision(record: CareEventRecord) -> str:
+    """Companion signal to `occurredAt`: which canonical TemporalPrecision
+    actually produced that ISO string, so "exact_timestamp"/"date" (a real
+    reported time) can be told apart from "relative"/"unknown" (a
+    fallback to processing time, not a reported time) without the
+    frontend having to guess from the ISO string alone. Sourced directly
+    from the canonical TemporalPrecision enum - never fabricated, never
+    collapsed - so this never claims more precision than extraction
+    actually captured."""
+    return record.event.occurred_at.precision.value
 
 
 def _evidence_dto(record: CareEventRecord) -> Optional[dict]:
@@ -124,6 +151,7 @@ def care_event_to_dto(record: CareEventRecord) -> dict:
         "summary": event.summary,
         "whatHappened": event.summary,
         "occurredAt": _occurred_at_iso(record),
+        "occurredAtPrecision": _occurred_at_precision(record),
         "reportedBy": event.reported_by or "Caregiver",
         "status": status.value,
         "evidence": _evidence_dto(record),

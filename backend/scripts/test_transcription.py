@@ -13,7 +13,14 @@ import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from core.transcription import MockTranscriptionProvider, VoxtralProvider, TranscriptionResult
+from core.transcription import (
+    DeepgramTranscriptionProvider,
+    GroqTranscriptionProvider,
+    MockTranscriptionProvider,
+    OpenAITranscriptionProvider,
+    TranscriptionResult,
+    VoxtralProvider,
+)
 
 
 def get_audio_bytes(audio_file: str) -> bytes:
@@ -45,7 +52,7 @@ def main():
     parser = argparse.ArgumentParser(description="Test transcription providers")
     parser.add_argument(
         "--provider",
-        choices=["mock", "voxtral"],
+        choices=["mock", "voxtral", "deepgram", "openai", "groq"],
         required=True,
         help="Transcription provider to use",
     )
@@ -71,6 +78,33 @@ def main():
             print(f"Error: Audio file not found: {args.audio_file}", file=sys.stderr)
             sys.exit(1)
         provider = VoxtralProvider()
+        audio_bytes = get_audio_bytes(args.audio_file)
+        audio_format = get_audio_format(args.audio_file)
+
+    elif args.provider == "deepgram":
+        # Key comes from the DEEPGRAM_API_KEY environment variable only.
+        if not os.path.exists(args.audio_file):
+            print(f"Error: Audio file not found: {args.audio_file}", file=sys.stderr)
+            sys.exit(1)
+        provider = DeepgramTranscriptionProvider()
+        audio_bytes = get_audio_bytes(args.audio_file)
+        audio_format = get_audio_format(args.audio_file)
+
+    elif args.provider == "openai":
+        # Key comes from the OPENAI_API_KEY environment variable only.
+        if not os.path.exists(args.audio_file):
+            print(f"Error: Audio file not found: {args.audio_file}", file=sys.stderr)
+            sys.exit(1)
+        provider = OpenAITranscriptionProvider()
+        audio_bytes = get_audio_bytes(args.audio_file)
+        audio_format = get_audio_format(args.audio_file)
+
+    elif args.provider == "groq":
+        # Key comes from the GROQ_API_KEY environment variable only.
+        if not os.path.exists(args.audio_file):
+            print(f"Error: Audio file not found: {args.audio_file}", file=sys.stderr)
+            sys.exit(1)
+        provider = GroqTranscriptionProvider()
         audio_bytes = get_audio_bytes(args.audio_file)
         audio_format = get_audio_format(args.audio_file)
 

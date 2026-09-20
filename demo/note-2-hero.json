@@ -1,0 +1,10 @@
+{
+  "note_id": "demo-note-2-hero",
+  "source_audio_key": "audio/demo-note-2-hero.wav",
+  "provider": "mock",
+  "model": "mock-transcriber-v1",
+  "status": "completed",
+  "transcript": "Dad took his medication this morning. My sister said Dad fell yesterday evening. Dad did not miss his appointment on Friday. I think Dad might have low energy today.",
+  "processed_at": "2026-09-19T12:00:00Z",
+  "error": null
+}

@@ -34,6 +34,7 @@ from .transcript import (
     TranscriptDocument,
     TranscriptSegment,
     from_day1_transcript,
+    from_stored_transcript,
     stable_segment_id,
 )
 from .validation import (
@@ -58,6 +59,7 @@ __all__ = [
     "TranscriptDocument",
     "TranscriptSegment",
     "from_day1_transcript",
+    "from_stored_transcript",
     "stable_segment_id",
     "SchemaValidationError",
     "assert_valid_care_event",

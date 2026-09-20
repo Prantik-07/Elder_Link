@@ -1,0 +1,10 @@
+{
+  "note_id": "demo-note-1-opening",
+  "source_audio_key": "audio/demo-note-1-opening.wav",
+  "provider": "mock",
+  "model": "mock-transcriber-v1",
+  "status": "completed",
+  "transcript": "Dad took his morning medication with breakfast.",
+  "processed_at": "2026-09-19T08:00:00Z",
+  "error": null
+}
