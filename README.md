@@ -30,6 +30,7 @@ Existing tools ask caregivers to stop what they are doing and fill in forms. The
 3. **Nothing is silently trusted.** Every event links back to the exact transcript sentence it came from, and starts life as *needs verification*.
 4. **A human decides.** The caregiver reviews the evidence and marks it verified or keeps it uncertain. The decision is **saved to the backend**, so it survives refreshes and reaches the next caregiver.
 5. **The next shift sees what changed.** Care, Timeline and Handoff views read the same live API.
+6. **The circle is kept in the loop.** Flagging an update can email the rest of the Care Circle, and one workspace can hold several patients. (See *Honest status* for what is deployed.)
 
 ## What makes it different: a trust model, not just a transcriber
 
@@ -136,7 +137,7 @@ python -m venv .venv && .venv/bin/pip install pytest boto3
 
 export GROQ_API_KEY=...                            # from your shell only, never committed
 .venv/bin/python backend/scripts/test_transcription.py \
-  --provider groq --audio-file elderlink-test.wav
+  --provider groq --audio-file path/to/any-short-recording.wav
 ```
 
 ### Deploy (AWS SAM)
@@ -169,7 +170,7 @@ backend/
   core/transcription/  Provider abstraction + Groq / Deepgram / OpenAI / Voxtral / Mock
   core/extraction/     Extraction pipeline, review policy, conflict detection, Bedrock + Mock
   core/persistence/    DynamoDB repository and frontend DTOs
-  lambdas/             audio_upload_url · process_audio · extract_events · get_timeline · update_care_event_status
+  lambdas/             audio_upload_url · process_audio · extract_events · get_timeline · update_care_event_status · notify_flag
 infra/               AWS SAM template + layer build scripts
 evaluation/          Golden cases + scoring harness for extractors
 docs/                Architecture and Care Event schema rationale
