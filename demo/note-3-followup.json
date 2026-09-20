@@ -1,0 +1,10 @@
+{
+  "note_id": "demo-note-3-followup",
+  "source_audio_key": "audio/demo-note-3-followup.wav",
+  "provider": "mock",
+  "model": "mock-transcriber-v1",
+  "status": "completed",
+  "transcript": "Dad had his cardiologist appointment this afternoon and his blood pressure was normal.",
+  "processed_at": "2026-09-19T16:00:00Z",
+  "error": null
+}
