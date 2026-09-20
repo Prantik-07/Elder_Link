@@ -5,7 +5,7 @@ import { useReducedMotion } from "../lib/useReducedMotion";
 import { EvidencePanel } from "./EvidencePanel";
 
 const SLIDE_MS = 0.28;
-const FADE_MS = 0.14;
+const FADE_MS = 0.1;
 
 /** Slide from the right edge of the panel's clipping container: translateX + opacity, ease-out. */
 export function useSlideMotion() {

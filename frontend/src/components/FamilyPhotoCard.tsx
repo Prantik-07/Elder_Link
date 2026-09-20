@@ -165,7 +165,7 @@ export function FamilyPhotoCard() {
             )}
           </div>
           {!preview && (
-            <p className="mt-1.5 text-[11.5px] text-[var(--color-ink-muted)]">
+            <p className="mt-1.5 text-[12px] text-[var(--color-ink-muted)]">
               This is just a sample illustration, not a real photo - add your own below.
             </p>
           )}
